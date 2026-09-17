@@ -3,5 +3,7 @@ dist/
 __pycache__/
 *.pyc
 *.db
+atl_firma
+respaldos/
 .venv/
 .DS_Store

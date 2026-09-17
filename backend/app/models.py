@@ -12,6 +12,19 @@ class Base(DeclarativeBase):
     pass
 
 
+class Usuario(Base):
+    """Coordinador o coordinadora con acceso propio al panel."""
+
+    __tablename__ = "usuario"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario: Mapped[str] = mapped_column(String(40), unique=True)
+    nombre: Mapped[str] = mapped_column(String(120))
+    clave: Mapped[str] = mapped_column(String(200))
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    creado: Mapped[date] = mapped_column(Date, default=date.today)
+    ultimo_ingreso: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
 class Espacio(Base):
     __tablename__ = "espacio"
     id: Mapped[int] = mapped_column(primary_key=True)

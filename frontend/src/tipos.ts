@@ -177,6 +177,15 @@ export type Objetivo = {
   seguimientos: Seguimiento[]
 }
 
+export type Usuario = {
+  id: number
+  usuario: string
+  nombre: string
+  activo: boolean
+  creado: string
+  ultimo_ingreso: string | null
+}
+
 export type Indicador = { clave: string; texto: string; valor: number | null }
 
 export type Personal = { id: number; nombre: string; funcion: string; email: string; telefono: string }

@@ -8,9 +8,14 @@ export function getNombre() {
   return localStorage.getItem('atl_nombre') || ''
 }
 
+export function getUsuario() {
+  return localStorage.getItem('atl_usuario') || ''
+}
+
 export function cerrarSesion() {
   localStorage.removeItem('atl_token')
   localStorage.removeItem('atl_nombre')
+  localStorage.removeItem('atl_usuario')
   location.reload()
 }
 
@@ -20,10 +25,14 @@ export async function login(nombre: string, password: string) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ nombre, password }),
   })
-  if (!r.ok) throw new Error('Contraseña incorrecta')
+  if (!r.ok) {
+    const cuerpo = await r.json().catch(() => ({}))
+    throw new Error(cuerpo.detail || 'Usuario o contraseña incorrectos')
+  }
   const datos = await r.json()
   localStorage.setItem('atl_token', datos.token)
   localStorage.setItem('atl_nombre', datos.nombre)
+  localStorage.setItem('atl_usuario', datos.usuario)
   return datos
 }
 

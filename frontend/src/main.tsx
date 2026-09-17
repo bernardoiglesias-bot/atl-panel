@@ -13,6 +13,7 @@ import Inicio from './pages/Inicio'
 import Objetivos from './pages/Objetivos'
 import Talleres from './pages/Talleres'
 import Tareas from './pages/Tareas'
+import Usuarios from './pages/Usuarios'
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'gastos', element: <Gastos /> },
       { path: 'feedback', element: <Feedback /> },
       { path: 'objetivos', element: <Objetivos /> },
+      { path: 'accesos', element: <Usuarios /> },
     ],
   },
 ])

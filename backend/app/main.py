@@ -1,4 +1,3 @@
-import hashlib
 import os
 from datetime import date, datetime, timedelta
 
@@ -9,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .db import SessionLocal, get_db, init_db
+from .db import DB_PATH, SessionLocal, get_db, init_db
 from .models import (
     Alumno,
     Docente,
@@ -24,15 +23,22 @@ from .models import (
     Seguimiento,
     Taller,
     Tarea,
+    Usuario,
 )
+from .respaldo import arrancar as arrancar_respaldo
 from .seed import cargar
-
-PASSWORD_HASH = os.environ.get(
-    "ATL_PASSWORD_HASH",
-    "4c5ffe5c49c42f76b8ffe00b3a77d91249503949b932fd53ba1103284b3757af",
+from .seguridad import (
+    HORAS_SESION,
+    bloqueo_restante,
+    clave_de_firma,
+    clave_inicial,
+    hash_clave,
+    limpiar_intentos,
+    registrar_fallo,
+    verificar_clave,
 )
-SECRET = os.environ.get("ATL_SECRET", "d7d998f2683e8fa84c1ebc5ea68db725641f58b1613014006bcb946e1b20718d")
-signer = URLSafeTimedSerializer(SECRET, salt="atl-login")
+
+signer = URLSafeTimedSerializer(clave_de_firma(os.path.dirname(os.path.abspath(DB_PATH))), salt="atl-login")
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 app = FastAPI(title="ATL — Panel de gestión")
@@ -48,16 +54,27 @@ def _startup() -> None:
     db = SessionLocal()
     try:
         cargar(db)
+        crear_usuario_inicial(db)
     finally:
         db.close()
+    arrancar_respaldo()
 
 
 # --------------------------------------------------------------- seguridad
+def crear_usuario_inicial(db: Session) -> None:
+    """Si todavía no hay nadie cargado, deja creado el primer acceso."""
+    if db.scalar(select(Usuario).limit(1)):
+        return
+    clave = clave_inicial()
+    db.add(Usuario(usuario="coordinacion", nombre="Coordinación", clave=hash_clave(clave)))
+    db.commit()
+
+
 def usuario(request: Request) -> str:
     auth = request.headers.get("authorization", "")
     token = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token", "")
     try:
-        return signer.loads(token, max_age=60 * 60 * 24 * 30)
+        return signer.loads(token, max_age=60 * 60 * HORAS_SESION)
     except BadSignature:
         raise HTTPException(status_code=401, detail="Sesión no válida")
 
@@ -67,12 +84,88 @@ class LoginIn(BaseModel):
     password: str
 
 
+class UsuarioIn(BaseModel):
+    usuario: str
+    nombre: str
+    password: str
+
+
+class ClaveIn(BaseModel):
+    password_actual: str
+    password_nueva: str
+
+
+def usuario_out(u: Usuario):
+    return {"id": u.id, "usuario": u.usuario, "nombre": u.nombre, "activo": u.activo,
+            "creado": u.creado.isoformat(), "ultimo_ingreso": u.ultimo_ingreso.isoformat() if u.ultimo_ingreso else None}
+
+
+def buscar_usuario(db: Session, nombre_usuario: str) -> Usuario | None:
+    return db.scalar(select(Usuario).where(func.lower(Usuario.usuario) == nombre_usuario.lower()))
+
+
 @app.post("/api/login")
-def login(datos: LoginIn):
-    if hashlib.sha256(datos.password.encode()).hexdigest() != PASSWORD_HASH:
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
-    nombre = datos.nombre.strip() or "Coordinación"
-    return {"token": signer.dumps(nombre), "nombre": nombre}
+def login(datos: LoginIn, request: Request, db: Session = Depends(get_db)):
+    nombre_usuario = datos.nombre.strip()
+    llave = f"{request.client.host if request.client else 'sin-ip'}|{nombre_usuario.lower()}"
+    espera = bloqueo_restante(llave)
+    if espera:
+        raise HTTPException(429, f"Demasiados intentos fallidos. Probá de nuevo en {espera // 60 + 1} minutos")
+
+    u = buscar_usuario(db, nombre_usuario)
+    if not u or not u.activo or not verificar_clave(datos.password, u.clave):
+        registrar_fallo(llave)
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+    limpiar_intentos(llave)
+    u.ultimo_ingreso = date.today()
+    db.commit()
+    return {"token": signer.dumps(u.usuario), "nombre": u.nombre, "usuario": u.usuario,
+            "horas_sesion": HORAS_SESION}
+
+
+@app.get("/api/usuarios")
+def listar_usuarios(db: Session = Depends(get_db), _: str = Depends(usuario)):
+    return [usuario_out(u) for u in db.scalars(select(Usuario).order_by(Usuario.nombre))]
+
+
+@app.post("/api/usuarios")
+def crear_usuario(datos: UsuarioIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    nombre_usuario = datos.usuario.strip().lower()
+    if len(nombre_usuario) < 3:
+        raise HTTPException(400, "El usuario necesita al menos 3 letras")
+    if len(datos.password) < 8:
+        raise HTTPException(400, "La contraseña necesita al menos 8 caracteres")
+    if buscar_usuario(db, nombre_usuario):
+        raise HTTPException(400, "Ya existe ese usuario")
+    u = Usuario(usuario=nombre_usuario, nombre=datos.nombre.strip() or nombre_usuario, clave=hash_clave(datos.password))
+    db.add(u)
+    db.commit()
+    return usuario_out(u)
+
+
+@app.post("/api/usuarios/clave")
+def cambiar_clave(datos: ClaveIn, db: Session = Depends(get_db), quien: str = Depends(usuario)):
+    u = buscar_usuario(db, quien)
+    if not u or not verificar_clave(datos.password_actual, u.clave):
+        raise HTTPException(400, "La contraseña actual no coincide")
+    if len(datos.password_nueva) < 8:
+        raise HTTPException(400, "La contraseña nueva necesita al menos 8 caracteres")
+    u.clave = hash_clave(datos.password_nueva)
+    db.commit()
+    return usuario_out(u)
+
+
+@app.delete("/api/usuarios/{usuario_id}")
+def desactivar_usuario(usuario_id: int, db: Session = Depends(get_db), quien: str = Depends(usuario)):
+    u = db.get(Usuario, usuario_id)
+    if not u:
+        raise HTTPException(404, "No existe")
+    if u.usuario == quien:
+        raise HTTPException(400, "No podés desactivar tu propio acceso")
+    u.activo = False
+    db.commit()
+    return usuario_out(u)
 
 
 @app.get("/healthz")

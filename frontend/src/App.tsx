@@ -13,6 +13,7 @@ const SECCIONES = [
   { to: '/gastos', texto: 'Gastos' },
   { to: '/feedback', texto: 'Feedback' },
   { to: '/objetivos', texto: 'Objetivos' },
+  { to: '/accesos', texto: 'Accesos' },
 ]
 
 function Login({ onEntrar }: { onEntrar: () => void }) {
@@ -28,8 +29,8 @@ function Login({ onEntrar }: { onEntrar: () => void }) {
     try {
       await login(nombre, password)
       onEntrar()
-    } catch {
-      setError('Contraseña incorrecta')
+    } catch (e) {
+      setError((e as Error).message)
     } finally {
       setCargando(false)
     }
@@ -42,7 +43,7 @@ function Login({ onEntrar }: { onEntrar: () => void }) {
           <h1 className="text-xl font-semibold text-marca-800">Aulas para el Tiempo Libre</h1>
           <p className="text-sm text-slate-500">Panel de gestión — 1º cuatrimestre 2026</p>
         </div>
-        <input className="campo" placeholder="Tu nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        <input className="campo" placeholder="Tu usuario" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         <input
           className="campo"
           type="password"
