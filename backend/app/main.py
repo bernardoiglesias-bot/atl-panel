@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -994,3 +996,18 @@ def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
                 "clases": len([t for t in talleres if t.dia == date.today().weekday()])},
         "actualizado": datetime.now().isoformat(timespec="seconds"),
     }
+
+
+# ------------------------------------------------------------ panel web
+WEB = os.environ.get("ATL_WEB_DIR", os.path.join(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))), "web"))
+
+if os.path.isdir(WEB):
+    app.mount("/assets", StaticFiles(directory=os.path.join(WEB, "assets")), name="assets")
+
+    @app.get("/{resto:path}")
+    def panel(resto: str):
+        archivo = os.path.join(WEB, resto)
+        if resto and os.path.isfile(archivo):
+            return FileResponse(archivo)
+        return FileResponse(os.path.join(WEB, "index.html"))
