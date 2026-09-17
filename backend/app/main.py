@@ -1,3 +1,4 @@
+import hashlib
 import os
 from datetime import date, datetime, timedelta
 
@@ -26,8 +27,11 @@ from .models import (
 )
 from .seed import cargar
 
-PASSWORD = os.environ.get("ATL_PASSWORD", "atl2026")
-SECRET = os.environ.get("ATL_SECRET", "atl-clave-de-firma-local")
+PASSWORD_HASH = os.environ.get(
+    "ATL_PASSWORD_HASH",
+    "4c5ffe5c49c42f76b8ffe00b3a77d91249503949b932fd53ba1103284b3757af",
+)
+SECRET = os.environ.get("ATL_SECRET", "d7d998f2683e8fa84c1ebc5ea68db725641f58b1613014006bcb946e1b20718d")
 signer = URLSafeTimedSerializer(SECRET, salt="atl-login")
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
@@ -65,7 +69,7 @@ class LoginIn(BaseModel):
 
 @app.post("/api/login")
 def login(datos: LoginIn):
-    if datos.password != PASSWORD:
+    if hashlib.sha256(datos.password.encode()).hexdigest() != PASSWORD_HASH:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
     nombre = datos.nombre.strip() or "Coordinación"
     return {"token": signer.dumps(nombre), "nombre": nombre}
