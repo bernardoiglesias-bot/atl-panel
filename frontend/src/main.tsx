@@ -7,8 +7,12 @@ import Agenda from './pages/Agenda'
 import Alumnos from './pages/Alumnos'
 import Docentes from './pages/Docentes'
 import Espacios from './pages/Espacios'
+import Feedback from './pages/Feedback'
+import Gastos from './pages/Gastos'
 import Inicio from './pages/Inicio'
+import Objetivos from './pages/Objetivos'
 import Talleres from './pages/Talleres'
+import Tareas from './pages/Tareas'
 
 const router = createBrowserRouter([
   {
@@ -21,6 +25,10 @@ const router = createBrowserRouter([
       { path: 'docentes', element: <Docentes /> },
       { path: 'alumnos', element: <Alumnos /> },
       { path: 'espacios', element: <Espacios /> },
+      { path: 'tareas', element: <Tareas /> },
+      { path: 'gastos', element: <Gastos /> },
+      { path: 'feedback', element: <Feedback /> },
+      { path: 'objetivos', element: <Objetivos /> },
     ],
   },
 ])

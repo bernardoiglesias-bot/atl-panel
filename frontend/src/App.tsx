@@ -9,6 +9,10 @@ const SECCIONES = [
   { to: '/docentes', texto: 'Docentes' },
   { to: '/alumnos', texto: 'Alumnos' },
   { to: '/espacios', texto: 'Espacios' },
+  { to: '/tareas', texto: 'Tareas' },
+  { to: '/gastos', texto: 'Gastos' },
+  { to: '/feedback', texto: 'Feedback' },
+  { to: '/objetivos', texto: 'Objetivos' },
 ]
 
 function Login({ onEntrar }: { onEntrar: () => void }) {

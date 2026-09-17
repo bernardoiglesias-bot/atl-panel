@@ -18,6 +18,10 @@ type Resumen = {
   talleres_llenos: { id: number; nombre: string; inscriptos: number; cupo_max: number | null }[]
   talleres_bajos: { id: number; nombre: string; inscriptos: number; dia_nombre: string; desde: string }[]
   hoy: { fecha: string; dia_nombre: string; clases: number }
+  tareas: { pendientes: number; urgentes: number; vencidas: number }
+  gastos: { pendiente_rendir: number; a_resolver: number }
+  objetivos_en_curso: number
+  feedback_registrados: number
 }
 
 function Dato({ valor, texto, detalle }: { valor: string | number; texto: string; detalle?: string }) {
@@ -140,6 +144,32 @@ export default function Inicio() {
           </p>
           <p className="text-sm text-slate-600">{r.alumnos_multi_taller} alumnos cursan más de un taller.</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Link to="/tareas" className="tarjeta p-4 hover:border-marca-600/40">
+          <p className="text-2xl font-semibold text-marca-700">{r.tareas.pendientes}</p>
+          <p className="text-sm text-slate-600">tareas pendientes</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {r.tareas.urgentes} urgentes
+            {r.tareas.vencidas > 0 && <span className="text-rose-600"> · {r.tareas.vencidas} con fecha pasada</span>}
+          </p>
+        </Link>
+        <Link to="/gastos" className="tarjeta p-4 hover:border-marca-600/40">
+          <p className="text-2xl font-semibold text-marca-700">{r.gastos.a_resolver}</p>
+          <p className="text-sm text-slate-600">gastos a resolver</p>
+          <p className="text-xs text-slate-400 mt-1">
+            $ {r.gastos.pendiente_rendir.toLocaleString('es-AR')} sin rendir
+          </p>
+        </Link>
+        <Link to="/objetivos" className="tarjeta p-4 hover:border-marca-600/40">
+          <p className="text-2xl font-semibold text-marca-700">{r.objetivos_en_curso}</p>
+          <p className="text-sm text-slate-600">objetivos en curso</p>
+        </Link>
+        <Link to="/feedback" className="tarjeta p-4 hover:border-marca-600/40">
+          <p className="text-2xl font-semibold text-marca-700">{r.feedback_registrados}</p>
+          <p className="text-sm text-slate-600">devoluciones registradas</p>
+        </Link>
       </div>
     </div>
   )

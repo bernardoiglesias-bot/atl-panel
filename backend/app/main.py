@@ -9,7 +9,21 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from .db import SessionLocal, get_db, init_db
-from .models import Alumno, Docente, Espacio, Evento, ExcepcionClase, Inscripcion, Personal, Taller
+from .models import (
+    Alumno,
+    Docente,
+    Espacio,
+    Evento,
+    ExcepcionClase,
+    Feedback,
+    Gasto,
+    Inscripcion,
+    Objetivo,
+    Personal,
+    Seguimiento,
+    Taller,
+    Tarea,
+)
 from .seed import cargar
 
 PASSWORD = os.environ.get("ATL_PASSWORD", "atl2026")
@@ -442,6 +456,384 @@ def asignar_taller(inscripcion_id: int, datos: AsignarTallerIn, db: Session = De
     return {"id": i.id}
 
 
+# ----------------------------------------------------------------- tareas
+PLAZOS = ["Urgente", "Corto", "Mediano", "Largo"]
+
+
+class TareaIn(BaseModel):
+    titulo: str
+    detalle: str = ""
+    plazo: str = "Corto"
+    estado: str = "Pendiente"
+    responsable: str = ""
+    area: str = ""
+    espacio_id: int | None = None
+    vence: date | None = None
+    objetivo_id: int | None = None
+
+
+def tarea_out(t: Tarea):
+    return {"id": t.id, "titulo": t.titulo, "detalle": t.detalle, "plazo": t.plazo, "estado": t.estado,
+            "responsable": t.responsable, "area": t.area, "espacio_id": t.espacio_id,
+            "espacio": t.espacio.nombre if t.espacio else "", "objetivo_id": t.objetivo_id,
+            "objetivo": t.objetivo.titulo if t.objetivo else "",
+            "vence": t.vence.isoformat() if t.vence else None, "creada": t.creada.isoformat() if t.creada else None,
+            "cerrada": t.cerrada.isoformat() if t.cerrada else None, "vencida": t.vencida}
+
+
+@app.get("/api/tareas")
+def listar_tareas(estado: str = "", plazo: str = "", db: Session = Depends(get_db), _: str = Depends(usuario)):
+    q = select(Tarea).options(selectinload(Tarea.espacio), selectinload(Tarea.objetivo))
+    if estado:
+        q = q.where(Tarea.estado == estado)
+    if plazo:
+        q = q.where(Tarea.plazo == plazo)
+    tareas = db.scalars(q).all()
+    orden = {p: i for i, p in enumerate(PLAZOS)}
+    tareas.sort(key=lambda t: (t.estado == "Hecha", orden.get(t.plazo, 9), t.vence or date.max))
+    return [tarea_out(t) for t in tareas]
+
+
+@app.post("/api/tareas")
+def crear_tarea(datos: TareaIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+    t = Tarea(**datos.model_dump(), creada=date.today())
+    if not t.responsable:
+        t.responsable = u
+    db.add(t)
+    db.commit()
+    return tarea_out(t)
+
+
+@app.put("/api/tareas/{tarea_id}")
+def editar_tarea(tarea_id: int, datos: TareaIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    t = db.get(Tarea, tarea_id)
+    if not t:
+        raise HTTPException(404, "No existe")
+    t.titulo = datos.titulo
+    t.detalle = datos.detalle
+    t.plazo = datos.plazo
+    t.estado = datos.estado
+    t.responsable = datos.responsable
+    t.area = datos.area
+    t.espacio_id = datos.espacio_id
+    t.vence = datos.vence
+    t.objetivo_id = datos.objetivo_id
+    t.cerrada = date.today() if t.estado == "Hecha" and not t.cerrada else (None if t.estado != "Hecha" else t.cerrada)
+    db.commit()
+    return tarea_out(t)
+
+
+@app.delete("/api/tareas/{tarea_id}")
+def borrar_tarea(tarea_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    t = db.get(Tarea, tarea_id)
+    if t:
+        db.delete(t)
+        db.commit()
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ gastos
+ETAPAS = ["Necesidad", "Presupuestado", "Adelanto pedido", "Adelanto recibido", "Rendido", "Rechazado"]
+
+
+class GastoIn(BaseModel):
+    concepto: str
+    detalle: str = ""
+    rubro: str = ""
+    etapa: str = "Necesidad"
+    monto_presupuestado: float | None = None
+    monto_adelanto: float | None = None
+    monto_rendido: float | None = None
+    proveedor: str = ""
+    solicitante: str = ""
+    espacio_id: int | None = None
+    fecha_necesidad: date | None = None
+    notas: str = ""
+
+
+def gasto_out(g: Gasto):
+    return {"id": g.id, "concepto": g.concepto, "detalle": g.detalle, "rubro": g.rubro, "etapa": g.etapa,
+            "monto_presupuestado": g.monto_presupuestado, "monto_adelanto": g.monto_adelanto,
+            "monto_rendido": g.monto_rendido, "proveedor": g.proveedor, "solicitante": g.solicitante,
+            "espacio_id": g.espacio_id, "espacio": g.espacio.nombre if g.espacio else "",
+            "fecha": g.fecha.isoformat() if g.fecha else None,
+            "fecha_necesidad": g.fecha_necesidad.isoformat() if g.fecha_necesidad else None,
+            "notas": g.notas, "pendiente_rendir": g.pendiente_rendir}
+
+
+@app.get("/api/gastos")
+def listar_gastos(etapa: str = "", db: Session = Depends(get_db), _: str = Depends(usuario)):
+    q = select(Gasto).options(selectinload(Gasto.espacio)).order_by(Gasto.fecha.desc(), Gasto.id.desc())
+    if etapa:
+        q = q.where(Gasto.etapa == etapa)
+    gastos = db.scalars(q).all()
+    return {
+        "gastos": [gasto_out(g) for g in gastos],
+        "totales": {
+            "presupuestado": round(sum(g.monto_presupuestado or 0 for g in gastos), 2),
+            "adelantado": round(sum(g.monto_adelanto or 0 for g in gastos), 2),
+            "rendido": round(sum(g.monto_rendido or 0 for g in gastos), 2),
+            "pendiente_rendir": round(sum(g.pendiente_rendir for g in gastos), 2),
+        },
+        "por_etapa": {e: len([g for g in gastos if g.etapa == e]) for e in ETAPAS},
+    }
+
+
+@app.post("/api/gastos")
+def crear_gasto(datos: GastoIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+    g = Gasto(**datos.model_dump(), fecha=date.today())
+    if not g.solicitante:
+        g.solicitante = u
+    db.add(g)
+    db.commit()
+    return gasto_out(g)
+
+
+@app.put("/api/gastos/{gasto_id}")
+def editar_gasto(gasto_id: int, datos: GastoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    g = db.get(Gasto, gasto_id)
+    if not g:
+        raise HTTPException(404, "No existe")
+    g.concepto = datos.concepto
+    g.detalle = datos.detalle
+    g.rubro = datos.rubro
+    g.etapa = datos.etapa
+    g.monto_presupuestado = datos.monto_presupuestado
+    g.monto_adelanto = datos.monto_adelanto
+    g.monto_rendido = datos.monto_rendido
+    g.proveedor = datos.proveedor
+    g.solicitante = datos.solicitante
+    g.espacio_id = datos.espacio_id
+    g.fecha_necesidad = datos.fecha_necesidad
+    g.notas = datos.notas
+    db.commit()
+    return gasto_out(g)
+
+
+@app.delete("/api/gastos/{gasto_id}")
+def borrar_gasto(gasto_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    g = db.get(Gasto, gasto_id)
+    if g:
+        db.delete(g)
+        db.commit()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- feedback
+class FeedbackIn(BaseModel):
+    fecha: date | None = None
+    docente_id: int | None = None
+    personal_id: int | None = None
+    persona_texto: str = ""
+    tipo: str = "Seguimiento"
+    valoracion: int | None = None
+    tema: str = ""
+    comentario: str = ""
+    acuerdos: str = ""
+
+
+def feedback_out(f: Feedback):
+    persona = f.docente.nombre if f.docente else (f.personal.nombre if f.personal else f.persona_texto)
+    return {"id": f.id, "fecha": f.fecha.isoformat() if f.fecha else None, "docente_id": f.docente_id,
+            "personal_id": f.personal_id, "persona_texto": f.persona_texto, "persona": persona,
+            "rol": "Docente" if f.docente_id else ("Personal" if f.personal_id else ""),
+            "tipo": f.tipo, "valoracion": f.valoracion, "tema": f.tema, "comentario": f.comentario,
+            "acuerdos": f.acuerdos, "registrado_por": f.registrado_por}
+
+
+@app.get("/api/feedback")
+def listar_feedback(docente_id: int | None = None, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    q = select(Feedback).options(selectinload(Feedback.docente), selectinload(Feedback.personal))
+    if docente_id:
+        q = q.where(Feedback.docente_id == docente_id)
+    filas = db.scalars(q.order_by(Feedback.fecha.desc(), Feedback.id.desc())).all()
+    return [feedback_out(f) for f in filas]
+
+
+@app.post("/api/feedback")
+def crear_feedback(datos: FeedbackIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+    cuerpo = datos.model_dump()
+    cuerpo["fecha"] = cuerpo["fecha"] or date.today()
+    f = Feedback(**cuerpo, registrado_por=u)
+    db.add(f)
+    db.commit()
+    return feedback_out(f)
+
+
+@app.put("/api/feedback/{feedback_id}")
+def editar_feedback(feedback_id: int, datos: FeedbackIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    f = db.get(Feedback, feedback_id)
+    if not f:
+        raise HTTPException(404, "No existe")
+    f.fecha = datos.fecha or f.fecha
+    f.docente_id = datos.docente_id
+    f.personal_id = datos.personal_id
+    f.persona_texto = datos.persona_texto
+    f.tipo = datos.tipo
+    f.valoracion = datos.valoracion
+    f.tema = datos.tema
+    f.comentario = datos.comentario
+    f.acuerdos = datos.acuerdos
+    db.commit()
+    return feedback_out(f)
+
+
+@app.delete("/api/feedback/{feedback_id}")
+def borrar_feedback(feedback_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    f = db.get(Feedback, feedback_id)
+    if f:
+        db.delete(f)
+        db.commit()
+    return {"ok": True}
+
+
+# --------------------------------------------------------------- objetivos
+def valor_indicador(nombre: str, db: Session) -> float | None:
+    """Indicadores que se calculan solos con los datos del sistema."""
+    alumnos = db.scalars(select(Alumno)).all()
+    if nombre == "fichas_completas_pct":
+        return round(100 * sum(1 for a in alumnos if a.ficha_completa) / len(alumnos), 1) if alumnos else None
+    if nombre == "inscripciones":
+        return float(db.scalar(select(func.count()).select_from(Inscripcion)) or 0)
+    if nombre == "alumnos":
+        return float(len(alumnos))
+    if nombre == "inscripciones_sin_taller":
+        return float(db.scalar(
+            select(func.count()).select_from(Inscripcion).where(Inscripcion.taller_id.is_(None))) or 0)
+    if nombre == "talleres_activos":
+        return float(db.scalar(select(func.count()).select_from(Taller).where(Taller.activo)) or 0)
+    if nombre == "talleres_bajos":
+        insc = conteos(db)
+        return float(len([t for t in db.scalars(select(Taller).where(Taller.activo)).all()
+                          if insc.get(t.id, 0) <= 3]))
+    if nombre == "tareas_vencidas":
+        return float(len([t for t in db.scalars(select(Tarea)).all() if t.vencida]))
+    if nombre == "gastos_pendientes_rendir":
+        return round(sum(g.pendiente_rendir for g in db.scalars(select(Gasto)).all()), 2)
+    if nombre == "feedback_registrados":
+        return float(db.scalar(select(func.count()).select_from(Feedback)) or 0)
+    return None
+
+
+INDICADORES = [
+    ("manual", "Lo cargamos a mano"),
+    ("fichas_completas_pct", "% de fichas de alumno completas"),
+    ("alumnos", "Cantidad de alumnos"),
+    ("inscripciones", "Cantidad de inscripciones"),
+    ("inscripciones_sin_taller", "Inscripciones sin taller asignado"),
+    ("talleres_activos", "Talleres activos"),
+    ("talleres_bajos", "Talleres con 3 inscriptos o menos"),
+    ("tareas_vencidas", "Tareas vencidas"),
+    ("gastos_pendientes_rendir", "Adelantos pendientes de rendir"),
+    ("feedback_registrados", "Devoluciones registradas"),
+]
+
+
+class ObjetivoIn(BaseModel):
+    titulo: str
+    detalle: str = ""
+    responsable: str = ""
+    indicador: str = "manual"
+    unidad: str = ""
+    valor_inicial: float | None = None
+    valor_meta: float | None = None
+    valor_actual: float | None = None
+    vence: date | None = None
+    estado: str = "En curso"
+
+
+class SeguimientoIn(BaseModel):
+    fecha: date | None = None
+    valor: float | None = None
+    comentario: str = ""
+
+
+def objetivo_out(o: Objetivo, db: Session):
+    actual = valor_indicador(o.indicador, db) if o.indicador != "manual" else o.valor_actual
+    inicial, meta = o.valor_inicial, o.valor_meta
+    avance = None
+    if actual is not None and meta is not None and inicial is not None and meta != inicial:
+        avance = max(0, min(100, round(100 * (actual - inicial) / (meta - inicial))))
+    return {"id": o.id, "titulo": o.titulo, "detalle": o.detalle, "responsable": o.responsable,
+            "indicador": o.indicador, "unidad": o.unidad, "valor_inicial": inicial, "valor_meta": meta,
+            "valor_actual": actual, "avance": avance, "estado": o.estado,
+            "vence": o.vence.isoformat() if o.vence else None,
+            "automatico": o.indicador != "manual",
+            "tareas": [{"id": t.id, "titulo": t.titulo, "estado": t.estado, "plazo": t.plazo} for t in o.tareas],
+            "seguimientos": [{"id": s.id, "fecha": s.fecha.isoformat(), "valor": s.valor,
+                              "comentario": s.comentario}
+                             for s in sorted(o.seguimientos, key=lambda s: s.fecha, reverse=True)]}
+
+
+@app.get("/api/indicadores")
+def listar_indicadores(db: Session = Depends(get_db), _: str = Depends(usuario)):
+    return [{"clave": c, "texto": t, "valor": valor_indicador(c, db)} for c, t in INDICADORES]
+
+
+@app.get("/api/objetivos")
+def listar_objetivos(db: Session = Depends(get_db), _: str = Depends(usuario)):
+    objetivos = db.scalars(
+        select(Objetivo).options(selectinload(Objetivo.tareas), selectinload(Objetivo.seguimientos))
+        .order_by(Objetivo.estado, Objetivo.vence)
+    ).all()
+    return [objetivo_out(o, db) for o in objetivos]
+
+
+@app.post("/api/objetivos")
+def crear_objetivo(datos: ObjetivoIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+    o = Objetivo(**datos.model_dump())
+    if not o.responsable:
+        o.responsable = u
+    if o.indicador != "manual" and o.valor_inicial is None:
+        o.valor_inicial = valor_indicador(o.indicador, db)
+    db.add(o)
+    db.commit()
+    return objetivo_out(o, db)
+
+
+@app.put("/api/objetivos/{objetivo_id}")
+def editar_objetivo(objetivo_id: int, datos: ObjetivoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    o = db.get(Objetivo, objetivo_id)
+    if not o:
+        raise HTTPException(404, "No existe")
+    o.titulo = datos.titulo
+    o.detalle = datos.detalle
+    o.responsable = datos.responsable
+    o.indicador = datos.indicador
+    o.unidad = datos.unidad
+    o.valor_inicial = datos.valor_inicial
+    o.valor_meta = datos.valor_meta
+    o.valor_actual = datos.valor_actual
+    o.vence = datos.vence
+    o.estado = datos.estado
+    db.commit()
+    return objetivo_out(o, db)
+
+
+@app.delete("/api/objetivos/{objetivo_id}")
+def borrar_objetivo(objetivo_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    o = db.get(Objetivo, objetivo_id)
+    if o:
+        db.delete(o)
+        db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/objetivos/{objetivo_id}/seguimientos")
+def crear_seguimiento(objetivo_id: int, datos: SeguimientoIn, db: Session = Depends(get_db),
+                      _: str = Depends(usuario)):
+    o = db.get(Objetivo, objetivo_id)
+    if not o:
+        raise HTTPException(404, "No existe")
+    s = Seguimiento(objetivo_id=objetivo_id, fecha=datos.fecha or date.today(), valor=datos.valor,
+                    comentario=datos.comentario)
+    db.add(s)
+    if datos.valor is not None and o.indicador == "manual":
+        o.valor_actual = datos.valor
+    db.commit()
+    return objetivo_out(o, db)
+
+
 # ---------------------------------------------------------------- resumen
 @app.get("/api/resumen")
 def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
@@ -485,6 +877,22 @@ def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
         "ocupacion": ocupacion,
         "talleres_llenos": llenos,
         "talleres_bajos": bajos,
+        "tareas": {
+            "pendientes": db.scalar(
+                select(func.count()).select_from(Tarea).where(Tarea.estado != "Hecha")) or 0,
+            "urgentes": db.scalar(select(func.count()).select_from(Tarea)
+                                  .where(Tarea.estado != "Hecha", Tarea.plazo == "Urgente")) or 0,
+            "vencidas": len([t for t in db.scalars(select(Tarea)).all() if t.vencida]),
+        },
+        "gastos": {
+            "pendiente_rendir": round(sum(g.pendiente_rendir for g in db.scalars(select(Gasto)).all()), 2),
+            "a_resolver": db.scalar(select(func.count()).select_from(Gasto)
+                                    .where(Gasto.etapa.in_(["Necesidad", "Presupuestado",
+                                                            "Adelanto pedido"]))) or 0,
+        },
+        "objetivos_en_curso": db.scalar(
+            select(func.count()).select_from(Objetivo).where(Objetivo.estado == "En curso")) or 0,
+        "feedback_registrados": db.scalar(select(func.count()).select_from(Feedback)) or 0,
         "hoy": {"fecha": date.today().isoformat(), "dia_nombre": DIAS[date.today().weekday()],
                 "clases": len([t for t in talleres if t.dia == date.today().weekday()])},
         "actualizado": datetime.now().isoformat(timespec="seconds"),

@@ -93,6 +93,94 @@ export type Docente = {
   talleres: { id: number; nombre: string; dia_nombre: string; desde: string; hasta: string; espacio: string }[]
 }
 
+export type Tarea = {
+  id: number
+  titulo: string
+  detalle: string
+  plazo: string
+  estado: string
+  responsable: string
+  area: string
+  espacio_id: number | null
+  espacio: string
+  objetivo_id: number | null
+  objetivo: string
+  vence: string | null
+  creada: string | null
+  cerrada: string | null
+  vencida: boolean
+}
+
+export type Gasto = {
+  id: number
+  concepto: string
+  detalle: string
+  rubro: string
+  etapa: string
+  monto_presupuestado: number | null
+  monto_adelanto: number | null
+  monto_rendido: number | null
+  proveedor: string
+  solicitante: string
+  espacio_id: number | null
+  espacio: string
+  fecha: string | null
+  fecha_necesidad: string | null
+  notas: string
+  pendiente_rendir: number
+}
+
+export type GastosResp = {
+  gastos: Gasto[]
+  totales: { presupuestado: number; adelantado: number; rendido: number; pendiente_rendir: number }
+  por_etapa: Record<string, number>
+}
+
+export type Feedback = {
+  id: number
+  fecha: string | null
+  docente_id: number | null
+  personal_id: number | null
+  persona_texto: string
+  persona: string
+  rol: string
+  tipo: string
+  valoracion: number | null
+  tema: string
+  comentario: string
+  acuerdos: string
+  registrado_por: string
+}
+
+export type Seguimiento = {
+  id: number
+  fecha: string
+  valor: number | null
+  comentario: string
+}
+
+export type Objetivo = {
+  id: number
+  titulo: string
+  detalle: string
+  responsable: string
+  indicador: string
+  unidad: string
+  valor_inicial: number | null
+  valor_meta: number | null
+  valor_actual: number | null
+  avance: number | null
+  estado: string
+  vence: string | null
+  automatico: boolean
+  tareas: { id: number; titulo: string; estado: string; plazo: string }[]
+  seguimientos: Seguimiento[]
+}
+
+export type Indicador = { clave: string; texto: string; valor: number | null }
+
+export type Personal = { id: number; nombre: string; funcion: string; email: string; telefono: string }
+
 export type Evento = {
   id: number
   titulo: string

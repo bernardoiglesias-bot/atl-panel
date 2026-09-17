@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 PERIODO_ACTUAL = "1C2026"
@@ -124,6 +124,114 @@ class Evento(Base):
     notas: Mapped[str] = mapped_column(Text, default="")
 
     espacio: Mapped[Espacio | None] = relationship()
+
+
+class Tarea(Base):
+    """Pendiente de gestión, clasificado por plazo."""
+
+    __tablename__ = "tarea"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    titulo: Mapped[str] = mapped_column(String(200))
+    detalle: Mapped[str] = mapped_column(Text, default="")
+    plazo: Mapped[str] = mapped_column(String(20), default="Corto")  # Urgente, Corto, Mediano, Largo
+    estado: Mapped[str] = mapped_column(String(20), default="Pendiente")
+    responsable: Mapped[str] = mapped_column(String(120), default="")
+    area: Mapped[str] = mapped_column(String(60), default="")
+    espacio_id: Mapped[int | None] = mapped_column(ForeignKey("espacio.id"), nullable=True)
+    vence: Mapped[date | None] = mapped_column(Date, nullable=True)
+    creada: Mapped[date] = mapped_column(Date, default=date.today)
+    cerrada: Mapped[date | None] = mapped_column(Date, nullable=True)
+    objetivo_id: Mapped[int | None] = mapped_column(ForeignKey("objetivo.id"), nullable=True)
+
+    espacio: Mapped[Espacio | None] = relationship()
+    objetivo: Mapped[Objetivo | None] = relationship(back_populates="tareas")
+
+    @property
+    def vencida(self) -> bool:
+        return bool(self.vence and self.estado != "Hecha" and self.vence < date.today())
+
+
+class Gasto(Base):
+    """Circuito presupuesto → pedido de adelanto → rendición."""
+
+    __tablename__ = "gasto"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    concepto: Mapped[str] = mapped_column(String(200))
+    detalle: Mapped[str] = mapped_column(Text, default="")
+    rubro: Mapped[str] = mapped_column(String(60), default="")
+    etapa: Mapped[str] = mapped_column(String(20), default="Necesidad")
+    # Necesidad → Presupuestado → Adelanto pedido → Adelanto recibido → Rendido → Rechazado
+    monto_presupuestado: Mapped[float | None] = mapped_column(Float, nullable=True)
+    monto_adelanto: Mapped[float | None] = mapped_column(Float, nullable=True)
+    monto_rendido: Mapped[float | None] = mapped_column(Float, nullable=True)
+    proveedor: Mapped[str] = mapped_column(String(120), default="")
+    solicitante: Mapped[str] = mapped_column(String(120), default="")
+    espacio_id: Mapped[int | None] = mapped_column(ForeignKey("espacio.id"), nullable=True)
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    fecha_necesidad: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notas: Mapped[str] = mapped_column(Text, default="")
+
+    espacio: Mapped[Espacio | None] = relationship()
+
+    @property
+    def pendiente_rendir(self) -> float:
+        return round((self.monto_adelanto or 0) - (self.monto_rendido or 0), 2)
+
+
+class Feedback(Base):
+    """Devolución o reunión de seguimiento con un docente o alguien del personal."""
+
+    __tablename__ = "feedback"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    docente_id: Mapped[int | None] = mapped_column(ForeignKey("docente.id"), nullable=True)
+    personal_id: Mapped[int | None] = mapped_column(ForeignKey("personal.id"), nullable=True)
+    persona_texto: Mapped[str] = mapped_column(String(120), default="")
+    tipo: Mapped[str] = mapped_column(String(30), default="Seguimiento")
+    # Seguimiento, Felicitación, Reclamo, Pedido, Entrevista
+    valoracion: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1 a 5
+    tema: Mapped[str] = mapped_column(String(200), default="")
+    comentario: Mapped[str] = mapped_column(Text, default="")
+    acuerdos: Mapped[str] = mapped_column(Text, default="")
+    registrado_por: Mapped[str] = mapped_column(String(120), default="")
+
+    docente: Mapped[Docente | None] = relationship()
+    personal: Mapped[Personal | None] = relationship()
+
+
+class Objetivo(Base):
+    """Objetivo de gestión con su indicador y seguimiento."""
+
+    __tablename__ = "objetivo"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    titulo: Mapped[str] = mapped_column(String(200))
+    detalle: Mapped[str] = mapped_column(Text, default="")
+    periodo: Mapped[str] = mapped_column(String(10), default=PERIODO_ACTUAL)
+    responsable: Mapped[str] = mapped_column(String(120), default="")
+    indicador: Mapped[str] = mapped_column(String(120), default="manual")
+    unidad: Mapped[str] = mapped_column(String(20), default="")
+    valor_inicial: Mapped[float | None] = mapped_column(Float, nullable=True)
+    valor_meta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    valor_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    vence: Mapped[date | None] = mapped_column(Date, nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), default="En curso")
+
+    tareas: Mapped[list[Tarea]] = relationship(back_populates="objetivo")
+    seguimientos: Mapped[list[Seguimiento]] = relationship(back_populates="objetivo",
+                                                           cascade="all, delete-orphan")
+
+
+class Seguimiento(Base):
+    """Registro de avance de un objetivo."""
+
+    __tablename__ = "seguimiento"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objetivo_id: Mapped[int] = mapped_column(ForeignKey("objetivo.id"))
+    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    valor: Mapped[float | None] = mapped_column(Float, nullable=True)
+    comentario: Mapped[str] = mapped_column(Text, default="")
+
+    objetivo: Mapped[Objetivo] = relationship(back_populates="seguimientos")
 
 
 class ExcepcionClase(Base):
