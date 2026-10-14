@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 
 A = '/home/ubuntu/attachments'
 WORD = f'{A}/055da4e0-34fe-44e2-b25a-4efa85aae4ce/TALLERES_2026_semanales.docx'
-ALUMNOS = f'{A}/7111afc2-0dd6-4f8c-88ed-9152c00630e3/Alumnos_por_Turno-Taller-Día_y_Horario.xlsx'
+ALUMNOS = f'{A}/03f9e3e2-c2bd-42cb-8b36-0829c19cb9fc/Alumnos_por_Turno-Taller-Día_y_Horario_1.xlsx'
 DOCENTES = f'{A}/376136e6-d067-4b23-b0fb-4dfd85731e5d/Datos_Profesores_as_Aulas_para_el_Tiempo_Libre_2026_.xlsx'
 PERSONAL = f'{A}/e77dce36-d82d-4a6b-bdb5-1daac46e5dc1/Planilla_de_Personal_-_Aulas_para_el_Tiempo_Libre.xlsx'
 OUT = os.path.join(os.path.dirname(__file__), '..', 'backend', 'data', 'seed.json')
@@ -210,7 +210,6 @@ talleres.sort(key=lambda t: (t['dia'], t['desde'], t['nombre']))
 
 # ------------------------------------------------------------- alumnos
 wb = load_workbook(ALUMNOS, data_only=True)
-alumnos = {}
 inscripciones = []
 HORA = re.compile(r'(\d{1,2})[:.]?(\d{2})?\s*(?:HS|H)?')
 
@@ -260,6 +259,20 @@ def buscar_taller(nombre, dia_hora):
     return None
 
 
+def misma_persona(a, b):
+    ta, tb = set(norm(a).split()), set(norm(b).split())
+    if ta <= tb or tb <= ta:
+        return True
+    return SequenceMatcher(None, norm(a), norm(b)).ratio() >= 0.75
+
+
+vistas = set()
+repetidas = 0
+dni_dudosos = set()
+alumnos_list = []
+por_dni = {}
+por_nombre = {}
+
 for ws in wb.worksheets:
     area, _, turno = ws.title.rpartition(' ')
     header = None
@@ -268,35 +281,49 @@ for ws in wb.worksheets:
         if not any(vals):
             continue
         if header is None:
-            if norm(vals[0]) == 'TALLER':
+            if norm(vals[0]) == 'TALLER' or norm(vals[1]).startswith('NOMBRE'):
                 header = True
             continue
         taller, nombre = vals[0].strip(), ' '.join(vals[1].replace(',', ' ').split())
-        if not nombre:
+        if not nombre or not taller:
             continue
         dni, mail, contacto, emergencia, obra = vals[2], vals[3], vals[4], vals[5], vals[6]
         dia_hora, prof = vals[7], vals[8]
-        clave = dni or norm(nombre)
-        al = alumnos.get(clave)
-        if not al:
-            al = alumnos[clave] = dict(nombre=titulo(nombre), dni=dni, email=mail, telefono=contacto,
-                                       emergencia=emergencia, obra_social=obra)
+        nn = norm(nombre)
+        al = None
+        if dni:
+            al = por_dni.get(dni)
+            if al and not misma_persona(al['nombre'], nombre):
+                # el mismo DNI en dos personas con nombres distintos: error de carga, se separan
+                dni_dudosos.add(dni)
+                al, dni = None, ''
+        if al is None:
+            al = por_nombre.get(nn)
+        if al is None:
+            al = dict(nombre=titulo(nombre), dni=dni, email=mail, telefono=contacto,
+                      emergencia=emergencia, obra_social=obra)
+            alumnos_list.append(al)
         else:
             for k, v in (('dni', dni), ('email', mail), ('telefono', contacto),
                          ('emergencia', emergencia), ('obra_social', obra)):
                 if not al[k] and v:
                     al[k] = v
+        por_nombre.setdefault(nn, al)
+        if dni:
+            por_dni.setdefault(dni, al)
+        clave = id(al)
+        firma = (clave, norm(taller), norm(dia_hora))
+        if firma in vistas:
+            repetidas += 1
+            continue
+        vistas.add(firma)
         inscripciones.append(dict(alumno=clave, taller_texto=titulo(taller), area=area, turno=turno,
                                   dia_hora=dia_hora, docente_texto=prof,
                                   taller_idx=buscar_taller(taller, dia_hora)))
 
-alumnos_list = list(alumnos.values())
-for i, a in enumerate(alumnos_list):
-    a['_i'] = i
+indice = {id(a): i for i, a in enumerate(alumnos_list)}
 for ins in inscripciones:
-    ins['alumno_idx'] = alumnos[ins.pop('alumno')]['_i']
-for a in alumnos_list:
-    a.pop('_i')
+    ins['alumno_idx'] = indice[ins.pop('alumno')]
 
 seed = dict(
     espacios=[dict(nombre=n, ubicacion=u, capacidad=c, uso=us) for n, u, c, us in ESPACIOS],
@@ -315,6 +342,7 @@ sin_taller = sum(1 for i in inscripciones if i['taller_idx'] is None)
 print('espacios', len(seed['espacios']), '| talleres', len(talleres), '| docentes fichas', len(docentes),
       '| personal', len(personal), '| alumnos', len(alumnos_list), '| inscripciones', len(inscripciones),
       '| sin taller', sin_taller)
+print('inscripciones repetidas descartadas:', repetidas, '| DNI compartidos por personas distintas:', len(dni_dudosos))
 print('talleres sin docente de ficha:', sum(1 for t in talleres if not t['docente_ficha']))
 faltan = sorted({(i['taller_texto'], i['dia_hora']) for i in inscripciones if i['taller_idx'] is None})
 for x in faltan[:40]:
