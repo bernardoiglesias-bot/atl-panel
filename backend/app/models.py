@@ -261,3 +261,19 @@ class ExcepcionClase(Base):
 
     taller: Mapped[Taller] = relationship()
     espacio: Mapped[Espacio | None] = relationship()
+
+
+class Pedido(Base):
+    """Insumo que hay que comprar, cargado por el personal antes de que se acabe."""
+
+    __tablename__ = "pedido"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    articulo: Mapped[str] = mapped_column(String(200))
+    cantidad: Mapped[str] = mapped_column(String(60), default="")
+    sector: Mapped[str] = mapped_column(String(60), default="Limpieza")
+    urgencia: Mapped[str] = mapped_column(String(20), default="Queda poco")  # Se acabó, Queda poco, Para reponer
+    estado: Mapped[str] = mapped_column(String(20), default="Pendiente")  # Pendiente, Comprado, Descartado
+    pedido_por: Mapped[str] = mapped_column(String(120), default="")
+    nota: Mapped[str] = mapped_column(Text, default="")
+    creado: Mapped[date] = mapped_column(Date, default=date.today)
+    resuelto: Mapped[date | None] = mapped_column(Date, nullable=True)

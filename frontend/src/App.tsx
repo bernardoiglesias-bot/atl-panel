@@ -11,6 +11,7 @@ const SECCIONES = [
   { to: '/espacios', texto: 'Espacios' },
   { to: '/tareas', texto: 'Tareas' },
   { to: '/gastos', texto: 'Gastos' },
+  { to: '/compras', texto: 'Compras' },
   { to: '/feedback', texto: 'Feedback' },
   { to: '/objetivos', texto: 'Objetivos' },
   { to: '/accesos', texto: 'Accesos' },

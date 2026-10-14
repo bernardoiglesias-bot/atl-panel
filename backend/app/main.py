@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from itsdangerous import BadSignature, URLSafeTimedSerializer
+from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -21,6 +21,7 @@ from .models import (
     Gasto,
     Inscripcion,
     Objetivo,
+    Pedido,
     Personal,
     Seguimiento,
     Taller,
@@ -40,7 +41,9 @@ from .seguridad import (
     verificar_clave,
 )
 
-signer = URLSafeTimedSerializer(clave_de_firma(os.path.dirname(os.path.abspath(DB_PATH))), salt="atl-login")
+_CLAVE_FIRMA = clave_de_firma(os.path.dirname(os.path.abspath(DB_PATH)))
+signer = URLSafeTimedSerializer(_CLAVE_FIRMA, salt="atl-login")
+firma_pedidos = URLSafeSerializer(_CLAVE_FIRMA, salt="atl-pedidos")
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 app = FastAPI(title="ATL — Panel de gestión")
@@ -933,6 +936,121 @@ def crear_seguimiento(objetivo_id: int, datos: SeguimientoIn, db: Session = Depe
     return objetivo_out(o, db)
 
 
+# ----------------------------------------------------------------- compras
+URGENCIAS = ["Se acabó", "Queda poco", "Para reponer"]
+SECTORES = ["Limpieza", "Administración", "Aulas", "Buffet", "Mantenimiento", "Otro"]
+
+
+class PedidoIn(BaseModel):
+    articulo: str
+    cantidad: str = ""
+    sector: str = "Limpieza"
+    urgencia: str = "Queda poco"
+    pedido_por: str = ""
+    nota: str = ""
+
+
+class PedidoEstadoIn(BaseModel):
+    estado: str
+
+
+def pedido_out(p: Pedido):
+    return {"id": p.id, "articulo": p.articulo, "cantidad": p.cantidad, "sector": p.sector, "urgencia": p.urgencia,
+            "estado": p.estado, "pedido_por": p.pedido_por, "nota": p.nota, "creado": p.creado.isoformat(),
+            "resuelto": p.resuelto.isoformat() if p.resuelto else None}
+
+
+def listar_pedidos_db(db: Session, estado: str = ""):
+    q = select(Pedido)
+    if estado:
+        q = q.where(Pedido.estado == estado)
+    pedidos = db.scalars(q).all()
+    orden = {u: i for i, u in enumerate(URGENCIAS)}
+    pedidos.sort(key=lambda p: (p.estado != "Pendiente", orden.get(p.urgencia, 9), p.creado))
+    return [pedido_out(p) for p in pedidos]
+
+
+def crear_pedido_db(db: Session, datos: PedidoIn):
+    if not datos.articulo.strip():
+        raise HTTPException(400, "Falta el artículo")
+    p = Pedido(**datos.model_dump(), creado=date.today())
+    db.add(p)
+    db.commit()
+    return pedido_out(p)
+
+
+def codigo_pedidos_valido(c: str) -> bool:
+    try:
+        return firma_pedidos.loads(c) == "pedidos"
+    except BadSignature:
+        return False
+
+
+@app.get("/api/pedidos")
+def listar_pedidos(estado: str = "", db: Session = Depends(get_db), _: str = Depends(usuario)):
+    return listar_pedidos_db(db, estado)
+
+
+@app.get("/api/pedidos/link")
+def link_pedidos(_: str = Depends(usuario)):
+    return {"ruta": f"/pedir?c={firma_pedidos.dumps('pedidos')}", "sectores": SECTORES, "urgencias": URGENCIAS}
+
+
+@app.post("/api/pedidos")
+def crear_pedido(datos: PedidoIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+    if not datos.pedido_por:
+        datos.pedido_por = u
+    return crear_pedido_db(db, datos)
+
+
+@app.put("/api/pedidos/{pedido_id}")
+def editar_pedido(pedido_id: int, datos: PedidoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    p = db.get(Pedido, pedido_id)
+    if not p:
+        raise HTTPException(404, "No existe")
+    for k, v in datos.model_dump().items():
+        setattr(p, k, v)
+    db.commit()
+    return pedido_out(p)
+
+
+@app.put("/api/pedidos/{pedido_id}/estado")
+def estado_pedido(pedido_id: int, datos: PedidoEstadoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    p = db.get(Pedido, pedido_id)
+    if not p:
+        raise HTTPException(404, "No existe")
+    p.estado = datos.estado
+    p.resuelto = None if datos.estado == "Pendiente" else date.today()
+    db.commit()
+    return pedido_out(p)
+
+
+@app.delete("/api/pedidos/{pedido_id}")
+def borrar_pedido(pedido_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    p = db.get(Pedido, pedido_id)
+    if p:
+        db.delete(p)
+        db.commit()
+    return {"ok": True}
+
+
+# Acceso del personal por link, sin contraseña: sólo ve y carga pedidos pendientes.
+@app.get("/api/publico/pedidos")
+def pedidos_publico(c: str, db: Session = Depends(get_db)):
+    if not codigo_pedidos_valido(c):
+        raise HTTPException(403, "Link no válido")
+    return {"pedidos": listar_pedidos_db(db, "Pendiente"), "sectores": SECTORES, "urgencias": URGENCIAS}
+
+
+@app.post("/api/publico/pedidos")
+def crear_pedido_publico(c: str, datos: PedidoIn, db: Session = Depends(get_db)):
+    if not codigo_pedidos_valido(c):
+        raise HTTPException(403, "Link no válido")
+    if not datos.pedido_por.strip():
+        raise HTTPException(400, "Poné tu nombre")
+    return crear_pedido_db(db, datos)
+
+
 # ---------------------------------------------------------------- resumen
 @app.get("/api/resumen")
 def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
@@ -989,6 +1107,7 @@ def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
                                     .where(Gasto.etapa.in_(["Necesidad", "Presupuestado",
                                                             "Adelanto pedido"]))) or 0,
         },
+        "compras_pendientes": db.scalar(select(func.count()).select_from(Pedido).where(Pedido.estado == "Pendiente")) or 0,
         "objetivos_en_curso": db.scalar(
             select(func.count()).select_from(Objetivo).where(Objetivo.estado == "En curso")) or 0,
         "feedback_registrados": db.scalar(select(func.count()).select_from(Feedback)) or 0,

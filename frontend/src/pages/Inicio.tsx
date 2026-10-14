@@ -20,6 +20,7 @@ type Resumen = {
   hoy: { fecha: string; dia_nombre: string; clases: number }
   tareas: { pendientes: number; urgentes: number; vencidas: number }
   gastos: { pendiente_rendir: number; a_resolver: number }
+  compras_pendientes: number
   objetivos_en_curso: number
   feedback_registrados: number
 }
@@ -161,6 +162,10 @@ export default function Inicio() {
           <p className="text-xs text-slate-400 mt-1">
             $ {r.gastos.pendiente_rendir.toLocaleString('es-AR')} sin rendir
           </p>
+        </Link>
+        <Link to="/compras" className="tarjeta p-4 hover:border-marca-600/40">
+          <p className="text-2xl font-semibold text-marca-700">{r.compras_pendientes}</p>
+          <p className="text-sm text-slate-600">cosas por comprar</p>
         </Link>
         <Link to="/objetivos" className="tarjeta p-4 hover:border-marca-600/40">
           <p className="text-2xl font-semibold text-marca-700">{r.objetivos_en_curso}</p>

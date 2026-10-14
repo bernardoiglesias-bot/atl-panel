@@ -202,3 +202,16 @@ export type Evento = {
   responsable: string
   notas: string
 }
+
+export type Pedido = {
+  id: number
+  articulo: string
+  cantidad: string
+  sector: string
+  urgencia: string
+  estado: string
+  pedido_por: string
+  nota: string
+  creado: string
+  resuelto: string | null
+}
