@@ -114,7 +114,7 @@ export default function Compras() {
         <div>
           <h2 className="text-lg font-semibold text-marca-800">Pedidos de insumos</h2>
           <p className="text-sm text-slate-500">
-            {pendientes.length} cosas por comprar
+            {pendientes.length} pedidos pendientes
             {pendientes.some((p) => p.urgencia === 'Se acabó') && (
               <span className="text-rose-600"> · {pendientes.filter((p) => p.urgencia === 'Se acabó').length} sin stock</span>
             )}
@@ -141,7 +141,7 @@ export default function Compras() {
         <p className="font-medium text-marca-800">Enlace para el personal administrativo y de limpieza</p>
         <p className="text-sm text-slate-500">
           Pasale este link al personal administrativo y de limpieza (por WhatsApp o pegado en la oficina). Entran sin
-          contraseña y sólo pueden cargar lo que hace falta comprar; no ven el resto del panel.
+          contraseña y sólo pueden registrar solicitudes de insumos; no ven el resto del panel.
         </p>
         <div className="flex flex-wrap gap-2 items-center">
           <input className="campo flex-1 min-w-[220px] text-xs" readOnly value={link} onFocus={(e) => e.target.select()} />
