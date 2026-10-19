@@ -112,11 +112,11 @@ export default function Compras() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-marca-800">Compras</h2>
+          <h2 className="text-lg font-semibold text-marca-800">Pedidos de insumos</h2>
           <p className="text-sm text-slate-500">
             {pendientes.length} cosas por comprar
             {pendientes.some((p) => p.urgencia === 'Se acabó') && (
-              <span className="text-rose-600"> · {pendientes.filter((p) => p.urgencia === 'Se acabó').length} ya se acabaron</span>
+              <span className="text-rose-600"> · {pendientes.filter((p) => p.urgencia === 'Se acabó').length} sin stock</span>
             )}
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function Compras() {
       </div>
 
       <div className="tarjeta p-4 space-y-2">
-        <p className="font-medium text-marca-800">Link para el personal</p>
+        <p className="font-medium text-marca-800">Enlace para el personal administrativo y de limpieza</p>
         <p className="text-sm text-slate-500">
           Pasale este link al personal administrativo y de limpieza (por WhatsApp o pegado en la oficina). Entran sin
           contraseña y sólo pueden cargar lo que hace falta comprar; no ven el resto del panel.
@@ -154,7 +154,7 @@ export default function Compras() {
         </div>
       </div>
 
-      {pendientes.length === 0 && <p className="text-sm text-slate-400">No hay nada pendiente de comprar.</p>}
+      {pendientes.length === 0 && <p className="text-sm text-slate-400">No hay pedidos pendientes.</p>}
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {porSector.map((s) => (
@@ -176,7 +176,7 @@ export default function Compras() {
 
       {verResueltos && resueltos.length > 0 && (
         <div className="space-y-2">
-          <h3 className="font-medium text-marca-800">Compradas o descartadas</h3>
+          <h3 className="font-medium text-marca-800">Pedidos resueltos</h3>
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {resueltos.map((p) => <Tarjeta key={p.id} p={p} />)}
           </div>
@@ -187,10 +187,10 @@ export default function Compras() {
         <div className="fixed inset-0 z-30 bg-black/40 grid place-items-center p-4" onClick={() => setEditando(null)}>
           <div className="tarjeta w-full max-w-lg p-5 space-y-3" onClick={(ev) => ev.stopPropagation()}>
             <h3 className="font-semibold text-marca-800">{editando === 'nuevo' ? 'Nuevo pedido' : 'Editar pedido'}</h3>
-            <input className="campo" placeholder="Qué hay que comprar" value={form.articulo} onChange={(e) => setForm({ ...form, articulo: e.target.value })} />
+            <input className="campo" placeholder="Insumo o artículo" value={form.articulo} onChange={(e) => setForm({ ...form, articulo: e.target.value })} />
             <div className="grid grid-cols-2 gap-3">
               <input className="campo" placeholder="Cantidad (ej. 6 rollos)" value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
-              <input className="campo" placeholder="Quién lo pide" value={form.pedido_por} onChange={(e) => setForm({ ...form, pedido_por: e.target.value })} />
+              <input className="campo" placeholder="Solicitante" value={form.pedido_por} onChange={(e) => setForm({ ...form, pedido_por: e.target.value })} />
               <select className="campo" value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })}>
                 {sectores.map((s) => <option key={s}>{s}</option>)}
               </select>
@@ -198,7 +198,7 @@ export default function Compras() {
                 {urgencias.map((u) => <option key={u}>{u}</option>)}
               </select>
             </div>
-            <textarea className="campo" rows={2} placeholder="Nota (marca, dónde se compra, etc.)" value={form.nota} onChange={(e) => setForm({ ...form, nota: e.target.value })} />
+            <textarea className="campo" rows={2} placeholder="Observaciones (marca, proveedor, etc.)" value={form.nota} onChange={(e) => setForm({ ...form, nota: e.target.value })} />
             <div className="flex justify-between">
               {editando !== 'nuevo' ? (
                 <button className="text-sm text-rose-600 hover:underline" onClick={borrar}>Borrar</button>

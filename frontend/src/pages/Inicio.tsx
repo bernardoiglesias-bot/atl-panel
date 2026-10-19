@@ -165,7 +165,7 @@ export default function Inicio() {
         </Link>
         <Link to="/compras" className="tarjeta p-4 hover:border-marca-600/40">
           <p className="text-2xl font-semibold text-marca-700">{r.compras_pendientes}</p>
-          <p className="text-sm text-slate-600">cosas por comprar</p>
+          <p className="text-sm text-slate-600">pedidos de insumos pendientes</p>
         </Link>
         <Link to="/objetivos" className="tarjeta p-4 hover:border-marca-600/40">
           <p className="text-2xl font-semibold text-marca-700">{r.objetivos_en_curso}</p>

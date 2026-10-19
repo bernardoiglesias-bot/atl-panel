@@ -23,7 +23,7 @@ export default function Pedir() {
   async function cargar() {
     const r = await fetch(`${BASE}/api/publico/pedidos?c=${encodeURIComponent(codigo)}`)
     if (!r.ok) {
-      setError('Este link no es válido. Pedile uno nuevo a coordinación.')
+      setError('Este enlace no es válido. Solicitá uno nuevo a coordinación.')
       return
     }
     setDatos(await r.json())
@@ -36,7 +36,7 @@ export default function Pedir() {
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     if (!nombre.trim() || !form.articulo.trim()) {
-      setError('Poné tu nombre y qué hay que comprar.')
+      setError('Indicá tu nombre y el insumo solicitado.')
       return
     }
     setEnviando(true)
@@ -49,7 +49,7 @@ export default function Pedir() {
     })
     setEnviando(false)
     if (!r.ok) {
-      setError((await r.json().catch(() => ({}))).detail || 'No se pudo guardar, probá de nuevo.')
+      setError((await r.json().catch(() => ({}))).detail || 'No se pudo registrar el pedido, intentá de nuevo.')
       return
     }
     setListo(form.articulo)
@@ -62,7 +62,7 @@ export default function Pedir() {
       <header className="bg-marca-700 text-white">
         <div className="mx-auto max-w-2xl px-4 py-3">
           <p className="font-semibold leading-tight">Aulas para el Tiempo Libre</p>
-          <p className="text-xs text-marca-100">Cosas que hay que comprar</p>
+          <p className="text-xs text-marca-100">Solicitud de insumos</p>
         </div>
       </header>
       <main className="mx-auto max-w-2xl p-4 space-y-4">
@@ -73,8 +73,8 @@ export default function Pedir() {
               <p className="text-sm text-slate-600">
                 Anotá acá lo que se está por acabar, así coordinación lo compra a tiempo.
               </p>
-              <input className="campo" placeholder="Tu nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-              <input className="campo" placeholder="Qué hay que comprar" value={form.articulo} onChange={(e) => setForm({ ...form, articulo: e.target.value })} />
+              <input className="campo" placeholder="Nombre y apellido" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+              <input className="campo" placeholder="Insumo o artículo" value={form.articulo} onChange={(e) => setForm({ ...form, articulo: e.target.value })} />
               <div className="grid grid-cols-2 gap-3">
                 <input className="campo" placeholder="Cantidad (ej. 6 rollos)" value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
                 <select className="campo" value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })}>
@@ -95,17 +95,17 @@ export default function Pedir() {
                   </button>
                 ))}
               </div>
-              <textarea className="campo" rows={2} placeholder="Nota (marca, dónde se compra…) — opcional" value={form.nota} onChange={(e) => setForm({ ...form, nota: e.target.value })} />
+              <textarea className="campo" rows={2} placeholder="Observaciones (marca, proveedor…) — opcional" value={form.nota} onChange={(e) => setForm({ ...form, nota: e.target.value })} />
               {error && <p className="text-sm text-rose-600">{error}</p>}
-              {listo && !error && <p className="text-sm text-emerald-700">Anotado: {listo}</p>}
+              {listo && !error && <p className="text-sm text-emerald-700">Solicitud registrada: {listo}</p>}
               <button className="boton w-full justify-center" disabled={enviando}>
-                {enviando ? 'Guardando…' : 'Anotar'}
+                {enviando ? 'Guardando…' : 'Enviar solicitud'}
               </button>
             </form>
 
             <div className="space-y-2">
-              <h3 className="font-medium text-marca-800">Ya pedido, falta comprar ({datos.pedidos.length})</h3>
-              {datos.pedidos.length === 0 && <p className="text-sm text-slate-400">Nada pendiente.</p>}
+              <h3 className="font-medium text-marca-800">Pedidos pendientes ({datos.pedidos.length})</h3>
+              {datos.pedidos.length === 0 && <p className="text-sm text-slate-400">No hay pedidos pendientes.</p>}
               {datos.pedidos.map((p) => (
                 <div key={p.id} className="tarjeta p-3 flex items-start justify-between gap-2">
                   <div>
