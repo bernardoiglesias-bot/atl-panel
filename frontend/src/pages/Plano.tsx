@@ -3,6 +3,22 @@ import { api } from '../api'
 import type { Taller } from '../tipos'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const FRANJAS = [
+  ['09:00', '10:50'],
+  ['11:00', '12:50'],
+  ['15:00', '16:50'],
+  ['17:00', '18:50'],
+  ['19:00', '20:50'],
+]
+
+function minutos(h: string) {
+  const [a, b] = h.split(':').map(Number)
+  return a * 60 + (b || 0)
+}
+
+function enFranja(c: Taller, [desde, hasta]: string[]) {
+  return minutos(c.desde) < minutos(hasta) && minutos(c.hasta) > minutos(desde)
+}
 
 const PB = `"a6 a6 esc esc a7 a7" "b1 b1 esc esc a7 a7" "ph ph ph ph ph ph" "a4 a4 pv b2 a3 a8" "a4 a4 pv a2 a2 a8" "buf buf pv a2 a2 a8" "a5 adm pv a1 a1 a8" "a5 adm ing a1 a1 a8"`
 const PA = `"ter ter ter" "a11 gal a10" "a11 gal b3" "a11 gal a9" "bal bal a9"`
@@ -18,20 +34,30 @@ function Aula({ num, clases }: { num: number; clases: Taller[] }) {
   return (
     <div className="tarjeta p-2 min-w-0" style={{ gridArea: `a${num}` }}>
       <div className="text-lg font-bold text-slate-400 leading-none mb-1">{num}</div>
-      {clases.length === 0 && <div className="text-xs text-slate-400 italic">Libre todo el día</div>}
       <ul className="space-y-1.5">
-        {clases.map((c) => (
-          <li key={c.id} className={`border-l-[3px] pl-1.5 text-xs leading-tight ${colorEstado(c.estado)}`}>
-            <div className="font-semibold tabular-nums">
-              {c.desde}–{c.hasta}
-            </div>
-            <div className="text-slate-800">{c.nombre}</div>
-            <div className="text-slate-500">
-              {c.docente} · {c.inscriptos ?? 0} insc.
-              {c.estado !== 'Con cupo' && c.estado !== 'Sin dato' && <b> · {c.estado}</b>}
-            </div>
-          </li>
-        ))}
+        {FRANJAS.map((f) => {
+          const empiezan = clases.filter((c) => minutos(c.desde) >= minutos(f[0]) && minutos(c.desde) < minutos(f[1]))
+          const ocupada = clases.some((c) => enFranja(c, f))
+          if (empiezan.length === 0 && ocupada) return null
+          if (empiezan.length === 0)
+            return (
+              <li key={f[0]} className="border-l-[3px] border-l-slate-200 pl-1.5 text-xs leading-tight text-slate-400">
+                <span className="tabular-nums">{f[0]}–{f[1]}</span> · LIBRE
+              </li>
+            )
+          return empiezan.map((c) => (
+            <li key={c.id} className={`border-l-[3px] pl-1.5 text-xs leading-tight ${colorEstado(c.estado)}`}>
+              <div className="font-semibold tabular-nums">
+                {c.desde}–{c.hasta}
+              </div>
+              <div className="text-slate-800">{c.nombre}</div>
+              <div className="text-slate-500">
+                {c.docente} · {c.inscriptos ?? 0} insc.
+                {c.estado !== 'Con cupo' && c.estado !== 'Sin dato' && <b> · {c.estado}</b>}
+              </div>
+            </li>
+          ))
+        })}
       </ul>
     </div>
   )
@@ -77,7 +103,7 @@ export default function Plano() {
         <div>
           <h1 className="text-2xl font-bold text-marca-800">Plano por día</h1>
           <p className="text-sm text-slate-500">
-            Qué taller funciona en cada aula. Rojo: lleno · gris: cerrado · celeste: nuevo.
+            Qué taller funciona en cada aula. Cinco franjas por aula (9, 11, 15, 17 y 19 hs); LIBRE donde no hay actividad. Rojo: lleno · gris: cerrado · celeste: nuevo.
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
