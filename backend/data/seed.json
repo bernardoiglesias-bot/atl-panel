@@ -1375,7 +1375,7 @@
    "hasta": "16:50",
    "turno": "Tarde",
    "espacio": "Aula 4",
-   "estado": "Cerrado",
+   "estado": "No se da",
    "observacion": "CERRADO",
    "cupo_max": null,
    "difusion": "En los Talleres de Diseño de Interiores y Paisajismo, buscamos desarrollar la creatividad, partiendo de conocimientos técnicos, con el fin de crear entornos bellos, sin dejar de lado la funcionalidad y el confort."
@@ -1389,7 +1389,7 @@
    "hasta": "16:50",
    "turno": "Tarde",
    "espacio": "Aula 11",
-   "estado": "Cerrado",
+   "estado": "No se da",
    "observacion": "CUPO",
    "cupo_max": 30,
    "difusion": "Ambos talleres están enfocado a dar equilibrio a nuestra vida emocional y física."

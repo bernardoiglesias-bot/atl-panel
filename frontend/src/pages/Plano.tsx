@@ -16,6 +16,8 @@ function minutos(h: string) {
   return a * 60 + (b || 0)
 }
 
+const FRANJAS_SABADO = [['09:00', '11:50']]
+
 function enFranja(c: Taller, [desde, hasta]: string[]) {
   return minutos(c.desde) < minutos(hasta) && minutos(c.hasta) > minutos(desde)
 }
@@ -30,12 +32,12 @@ function colorEstado(estado: string) {
   return 'border-l-marca-600/60'
 }
 
-function Aula({ num, clases }: { num: number; clases: Taller[] }) {
+function Aula({ num, clases, franjas }: { num: number; clases: Taller[]; franjas: string[][] }) {
   return (
     <div className="tarjeta p-2 min-w-0" style={{ gridArea: `a${num}` }}>
       <div className="text-lg font-bold text-slate-400 leading-none mb-1">{num}</div>
       <ul className="space-y-1.5">
-        {FRANJAS.map((f) => {
+        {franjas.map((f) => {
           const empiezan = clases.filter((c) => minutos(c.desde) >= minutos(f[0]) && minutos(c.desde) < minutos(f[1]))
           const ocupada = clases.some((c) => enFranja(c, f))
           if (empiezan.length === 0 && ocupada) return null
@@ -63,11 +65,19 @@ function Aula({ num, clases }: { num: number; clases: Taller[] }) {
   )
 }
 
-function Fijo({ area, texto, vertical = false }: { area: string; texto: string; vertical?: boolean }) {
+function Fijo({ area, texto, vertical = false, pasto = false }: { area: string; texto: string; vertical?: boolean; pasto?: boolean }) {
   return (
     <div
-      className="rounded-lg border border-slate-200 bg-slate-100 text-slate-500 text-xs font-medium grid place-items-center p-1 text-center"
-      style={{ gridArea: area, writingMode: vertical ? 'vertical-rl' : undefined }}
+      className={`rounded-lg border text-xs font-medium grid place-items-center p-1 text-center ${
+        pasto ? 'border-green-300 bg-green-100 text-green-800' : 'border-slate-200 bg-slate-100 text-slate-500'
+      }`}
+      style={{
+        gridArea: area,
+        writingMode: vertical ? 'vertical-rl' : undefined,
+        backgroundImage: pasto
+          ? 'repeating-linear-gradient(115deg, transparent 0 6px, rgba(22,163,74,.18) 6px 7px), repeating-linear-gradient(65deg, transparent 0 9px, rgba(22,163,74,.14) 9px 10px)'
+          : undefined,
+      }}
     >
       {texto}
     </div>
@@ -94,6 +104,7 @@ export default function Plano() {
     return m
   }, [talleres, dia])
 
+  const franjas = dia === 5 ? FRANJAS_SABADO : FRANJAS
   const sinAula = talleres.filter((t) => t.dia === dia && t.activo && !/\d/.test(t.espacio?.nombre ?? ''))
   const total = talleres.filter((t) => t.dia === dia && t.activo).length
 
@@ -103,7 +114,7 @@ export default function Plano() {
         <div>
           <h1 className="text-2xl font-bold text-marca-800">Plano por día</h1>
           <p className="text-sm text-slate-500">
-            Qué taller funciona en cada aula. Cinco franjas por aula (9, 11, 15, 17 y 19 hs); LIBRE donde no hay actividad. Rojo: lleno · gris: cerrado · celeste: nuevo.
+            Qué taller funciona en cada aula. Franjas por aula (9, 11, 15, 17 y 19 hs; sábados 9 a 11:50); LIBRE donde no hay actividad. Rojo: lleno · gris: cerrado · celeste: nuevo.
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -134,9 +145,9 @@ export default function Plano() {
             style={{ gridTemplateAreas: PB, gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gridAutoRows: 'minmax(56px, auto)' }}
           >
             {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-              <Aula key={n} num={n} clases={porAula[n] ?? []} />
+              <Aula key={n} num={n} clases={porAula[n] ?? []} franjas={franjas} />
             ))}
-            <Fijo area="esc" texto="Escalera a planta alta" />
+            <Fijo area="esc" texto="Patio" pasto />
             <Fijo area="b1" texto="Baño" />
             <Fijo area="b2" texto="Baño" />
             <Fijo area="ph" texto="Pasillo" />
@@ -153,7 +164,7 @@ export default function Plano() {
             style={{ gridTemplateAreas: PA, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gridAutoRows: 'minmax(56px, auto)' }}
           >
             {[9, 10, 11].map((n) => (
-              <Aula key={n} num={n} clases={porAula[n] ?? []} />
+              <Aula key={n} num={n} clases={porAula[n] ?? []} franjas={franjas} />
             ))}
             <Fijo area="ter" texto="Terraza" />
             <Fijo area="gal" texto="Galería" vertical />
