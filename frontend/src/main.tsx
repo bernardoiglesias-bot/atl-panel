@@ -13,6 +13,7 @@ import Gastos from './pages/Gastos'
 import Inicio from './pages/Inicio'
 import Objetivos from './pages/Objetivos'
 import Pedir from './pages/Pedir'
+import Plano from './pages/Plano'
 import Talleres from './pages/Talleres'
 import Tareas from './pages/Tareas'
 import Usuarios from './pages/Usuarios'
@@ -24,6 +25,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Inicio /> },
       { path: 'agenda', element: <Agenda /> },
+      { path: 'plano', element: <Plano /> },
       { path: 'talleres', element: <Talleres /> },
       { path: 'docentes', element: <Docentes /> },
       { path: 'alumnos', element: <Alumnos /> },

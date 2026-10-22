@@ -5,6 +5,7 @@ import { cerrarSesion, getNombre, getToken, login } from './api'
 const SECCIONES = [
   { to: '/', texto: 'Inicio', end: true },
   { to: '/agenda', texto: 'Agenda' },
+  { to: '/plano', texto: 'Plano' },
   { to: '/talleres', texto: 'Talleres' },
   { to: '/docentes', texto: 'Docentes' },
   { to: '/alumnos', texto: 'Alumnos' },
