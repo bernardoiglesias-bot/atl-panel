@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .db import DB_PATH, SessionLocal, get_db, init_db
 from .models import (
+    PERIODO_ACTUAL,
     Alumno,
     Docente,
     Espacio,
@@ -191,7 +192,7 @@ def taller_out(t: Taller, inscriptos: int | None = None):
         "observacion": t.observacion, "difusion": t.difusion, "activo": t.activo,
         "espacio": esp_out(t.espacio), "espacio_id": t.espacio_id,
         "docente_id": t.docente_id, "docente": t.docente.nombre if t.docente else t.docente_texto,
-        "docente_texto": t.docente_texto, "inscriptos": inscriptos,
+        "docente_texto": t.docente_texto, "inscriptos": inscriptos, "periodo": t.periodo,
     }
 
 
@@ -225,7 +226,7 @@ def agenda(fecha: str | None = None, db: Session = Depends(get_db), _: str = Dep
     espacios = db.scalars(select(Espacio).where(Espacio.activo).order_by(Espacio.orden)).all()
     talleres = db.scalars(
         select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente))
-        .where(Taller.dia == dia, Taller.activo).order_by(Taller.desde)
+        .where(Taller.dia == dia, Taller.activo, Taller.periodo == PERIODO_ACTUAL).order_by(Taller.desde)
     ).all()
     exc = {e.taller_id: e for e in db.scalars(select(ExcepcionClase).where(ExcepcionClase.fecha == f)).all()}
     insc = conteos(db)
@@ -348,7 +349,7 @@ class EspacioIn(BaseModel):
 @app.get("/api/espacios")
 def listar_espacios(db: Session = Depends(get_db), _: str = Depends(usuario)):
     espacios = db.scalars(select(Espacio).order_by(Espacio.orden)).all()
-    talleres = db.scalars(select(Taller).where(Taller.activo)).all()
+    talleres = db.scalars(select(Taller).where(Taller.activo, Taller.periodo == PERIODO_ACTUAL)).all()
     horas = {}
     for t in talleres:
         if t.espacio_id:
@@ -392,13 +393,14 @@ class TallerIn(BaseModel):
     observacion: str = ""
     difusion: str = ""
     activo: bool = True
+    periodo: str = PERIODO_ACTUAL
 
 
 @app.get("/api/talleres")
-def listar_talleres(db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_talleres(periodo: str = PERIODO_ACTUAL, db: Session = Depends(get_db), _: str = Depends(usuario)):
     talleres = db.scalars(
         select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente))
-        .order_by(Taller.dia, Taller.desde, Taller.nombre)
+        .where(Taller.periodo == periodo).order_by(Taller.dia, Taller.desde, Taller.nombre)
     ).all()
     insc = conteos(db)
     return [taller_out(t, insc.get(t.id, 0)) for t in talleres]
@@ -434,6 +436,58 @@ def editar_taller(taller_id: int, datos: TallerIn, db: Session = Depends(get_db)
     return taller_out(t)
 
 
+@app.delete("/api/talleres/{taller_id}")
+def borrar_taller(taller_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    t = db.get(Taller, taller_id)
+    if not t:
+        raise HTTPException(404, "No existe")
+    if t.periodo == PERIODO_ACTUAL:
+        raise HTTPException(400, "Los talleres del período actual no se borran; se desactivan")
+    db.delete(t)
+    db.commit()
+    return {"ok": True}
+
+
+def _minutos(h: str) -> int:
+    a, b = h.split(":")
+    return int(a) * 60 + int(b)
+
+
+@app.post("/api/planificacion/{periodo}/copiar")
+def copiar_planificacion(periodo: str, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    """Crea la grilla de un período nuevo a partir de los talleres activos del período actual."""
+    if db.scalar(select(func.count()).select_from(Taller).where(Taller.periodo == periodo)):
+        raise HTTPException(400, "Ese período ya tiene talleres cargados")
+    base = db.scalars(select(Taller).where(Taller.periodo == PERIODO_ACTUAL, Taller.activo)).all()
+    for t in base:
+        db.add(Taller(nombre=t.nombre, periodo=periodo, area=t.area, dia=t.dia, desde=t.desde, hasta=t.hasta,
+                      turno=t.turno, espacio_id=t.espacio_id, docente_id=t.docente_id, docente_texto=t.docente_texto,
+                      estado="Tentativo", cupo_max=t.cupo_max, observacion=f"Copiado de {PERIODO_ACTUAL}"))
+    db.commit()
+    return {"copiados": len(base)}
+
+
+@app.get("/api/planificacion/{periodo}/conflictos")
+def conflictos_planificacion(periodo: str, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    talleres = db.scalars(
+        select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente))
+        .where(Taller.periodo == periodo, Taller.activo).order_by(Taller.dia, Taller.desde)
+    ).all()
+    conflictos = []
+    for i, a in enumerate(talleres):
+        for b in talleres[i + 1:]:
+            if a.dia != b.dia or _minutos(b.desde) >= _minutos(a.hasta) or _minutos(a.desde) >= _minutos(b.hasta):
+                continue
+            doc_a = a.docente.nombre if a.docente else a.docente_texto
+            doc_b = b.docente.nombre if b.docente else b.docente_texto
+            par = [taller_out(a), taller_out(b)]
+            if a.espacio_id and a.espacio_id == b.espacio_id:
+                conflictos.append({"tipo": "espacio", "dia": DIAS[a.dia], "detalle": a.espacio.nombre, "talleres": par})
+            if doc_a and doc_a.strip().lower() == doc_b.strip().lower():
+                conflictos.append({"tipo": "docente", "dia": DIAS[a.dia], "detalle": doc_a, "talleres": par})
+    return conflictos
+
+
 # --------------------------------------------------------------- docentes
 class DocenteIn(BaseModel):
     nombre: str
@@ -458,7 +512,7 @@ def listar_docentes(db: Session = Depends(get_db), _: str = Depends(usuario)):
         "maquinaria": d.maquinaria, "sugerencias": d.sugerencias, "cupo_min": d.cupo_min, "cupo_max": d.cupo_max,
         "talleres": [{"id": t.id, "nombre": t.nombre, "dia_nombre": DIAS[t.dia], "desde": t.desde, "hasta": t.hasta,
                       "espacio": t.espacio.nombre if t.espacio else ""} for t in
-                     sorted(d.talleres, key=lambda t: (t.dia, t.desde))],
+                     sorted((t for t in d.talleres if t.periodo == PERIODO_ACTUAL), key=lambda t: (t.dia, t.desde))],
     } for d in docentes]
 
 
@@ -806,7 +860,7 @@ def valor_indicador(nombre: str, db: Session) -> float | None:
         return float(db.scalar(select(func.count()).select_from(Taller).where(Taller.activo)) or 0)
     if nombre == "talleres_bajos":
         insc = conteos(db)
-        return float(len([t for t in db.scalars(select(Taller).where(Taller.activo)).all()
+        return float(len([t for t in db.scalars(select(Taller).where(Taller.activo, Taller.periodo == PERIODO_ACTUAL)).all()
                           if insc.get(t.id, 0) <= 3]))
     if nombre == "tareas_vencidas":
         return float(len([t for t in db.scalars(select(Tarea)).all() if t.vencida]))
@@ -1054,7 +1108,7 @@ def crear_pedido_publico(c: str, datos: PedidoIn, db: Session = Depends(get_db))
 # ---------------------------------------------------------------- resumen
 @app.get("/api/resumen")
 def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
-    talleres = db.scalars(select(Taller).options(selectinload(Taller.espacio)).where(Taller.activo)).all()
+    talleres = db.scalars(select(Taller).options(selectinload(Taller.espacio)).where(Taller.activo, Taller.periodo == PERIODO_ACTUAL)).all()
     insc = conteos(db)
     alumnos = db.scalars(select(Alumno)).all()
     completas = sum(1 for a in alumnos if a.ficha_completa)

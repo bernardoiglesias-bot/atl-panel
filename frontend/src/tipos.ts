@@ -28,6 +28,7 @@ export type Taller = {
   docente_id: number | null
   docente_texto: string
   inscriptos: number | null
+  periodo: string
 }
 
 export type ItemAgenda = {
