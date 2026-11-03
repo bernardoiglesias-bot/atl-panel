@@ -91,7 +91,7 @@ export type Docente = {
   sugerencias: string
   cupo_min: string
   cupo_max: string
-  talleres: { id: number; nombre: string; dia_nombre: string; desde: string; hasta: string; espacio: string }[]
+  talleres: { id: number; nombre: string; dia_nombre: string; desde: string; hasta: string; espacio: string; activo: boolean }[]
 }
 
 export type Tarea = {

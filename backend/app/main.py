@@ -235,12 +235,12 @@ def agenda(fecha: str | None = None, db: Session = Depends(get_db), _: str = Dep
     for t in talleres:
         e = exc.get(t.id)
         if e and e.suspendida:
-            items.append({"tipo": "suspendida", "id": t.id, "titulo": t.nombre, "desde": t.desde, "hasta": t.hasta,
+            items.append({"tipo": "suspendida", "id": t.id, "titulo": t.nombre, "desde": t.desde, "hasta": t.hasta, "activo": t.activo,
                           "espacio": esp_out(t.espacio), "detalle": t.docente.nombre if t.docente else t.docente_texto,
                           "motivo": e.motivo, "inscriptos": insc.get(t.id, 0), "estado": t.estado})
             continue
         espacio = esp_out(e.espacio) if (e and e.espacio) else esp_out(t.espacio)
-        items.append({"tipo": "clase", "id": t.id, "titulo": t.nombre, "desde": t.desde, "hasta": t.hasta,
+        items.append({"tipo": "clase", "id": t.id, "titulo": t.nombre, "desde": t.desde, "hasta": t.hasta, "activo": t.activo,
                       "espacio": espacio, "detalle": t.docente.nombre if t.docente else t.docente_texto,
                       "motivo": e.motivo if e else "", "inscriptos": insc.get(t.id, 0), "estado": t.estado,
                       "cupo_max": t.cupo_max, "area": t.area})
@@ -510,9 +510,9 @@ def listar_docentes(db: Session = Depends(get_db), _: str = Depends(usuario)):
         "id": d.id, "nombre": d.nombre, "dni": d.dni, "email": d.email, "celular": d.celular,
         "nacimiento": d.nacimiento, "facturacion": d.facturacion, "necesidades": d.necesidades,
         "maquinaria": d.maquinaria, "sugerencias": d.sugerencias, "cupo_min": d.cupo_min, "cupo_max": d.cupo_max,
-        "talleres": [{"id": t.id, "nombre": t.nombre, "dia_nombre": DIAS[t.dia], "desde": t.desde, "hasta": t.hasta,
+        "talleres": [{"id": t.id, "nombre": t.nombre, "dia_nombre": DIAS[t.dia], "desde": t.desde, "hasta": t.hasta, "activo": t.activo,
                       "espacio": t.espacio.nombre if t.espacio else ""} for t in
-                     sorted((t for t in d.talleres if t.periodo == PERIODO_ACTUAL and t.activo), key=lambda t: (t.dia, t.desde))],
+                     sorted((t for t in d.talleres if t.periodo == PERIODO_ACTUAL), key=lambda t: (t.dia, t.desde))],
     } for d in docentes]
 
 

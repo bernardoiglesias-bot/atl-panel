@@ -33,16 +33,19 @@ export default function Docentes() {
             <button className="w-full text-left" onClick={() => setAbierto(abierto === d.id ? null : d.id)}>
               <p className="font-medium text-marca-800">{d.nombre}</p>
               <p className="text-sm text-slate-500">
-                {d.talleres.length} taller{d.talleres.length === 1 ? '' : 'es'} · {d.email || 'sin mail'}
+                {d.talleres.filter((t) => t.activo).length} taller{d.talleres.filter((t) => t.activo).length === 1 ? '' : 'es'} · {d.email || 'sin mail'}
               </p>
             </button>
             <ul className="mt-2 text-sm text-slate-600 space-y-0.5">
               {d.talleres.map((t) => (
-                <li key={t.id} className="flex gap-2">
+                <li key={t.id} className={`flex gap-2 ${t.activo ? '' : 'text-slate-400 line-through'}`}>
                   <span className="w-32 shrink-0 text-slate-400">
                     {t.dia_nombre} {t.desde}
                   </span>
                   <span className="flex-1 truncate">{t.nombre}</span>
+                  {!t.activo && (
+                    <span className="shrink-0 rounded bg-slate-100 px-1.5 text-xs text-slate-500 no-underline">Dado de baja</span>
+                  )}
                   <span className="text-slate-400">{t.espacio}</span>
                 </li>
               ))}
