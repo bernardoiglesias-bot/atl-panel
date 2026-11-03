@@ -516,6 +516,32 @@ def listar_docentes(db: Session = Depends(get_db), _: str = Depends(usuario)):
     } for d in docentes]
 
 
+@app.post("/api/docentes")
+def crear_docente(datos: DocenteIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    d = Docente(**datos.model_dump())
+    db.add(d)
+    db.commit()
+    return {"id": d.id}
+
+
+@app.post("/api/docentes/{docente_id}/unificar/{en_id}")
+def unificar_docente(docente_id: int, en_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    """Pasa talleres y feedback de una ficha repetida a la que se conserva y borra la repetida."""
+    d, en = db.get(Docente, docente_id), db.get(Docente, en_id)
+    if not d or not en or d is en:
+        raise HTTPException(404, "No existe")
+    for t in db.scalars(select(Taller).where(Taller.docente_id == d.id)).all():
+        t.docente_id = en.id
+    for f in db.scalars(select(Feedback).where(Feedback.docente_id == d.id)).all():
+        f.docente_id = en.id
+    for k in ("dni", "email", "celular", "nacimiento", "facturacion", "necesidades", "maquinaria", "sugerencias", "cupo_min", "cupo_max"):
+        if not getattr(en, k) and getattr(d, k):
+            setattr(en, k, getattr(d, k))
+    db.delete(d)
+    db.commit()
+    return {"id": en.id}
+
+
 @app.put("/api/docentes/{docente_id}")
 def editar_docente(docente_id: int, datos: DocenteIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
     d = db.get(Docente, docente_id)
