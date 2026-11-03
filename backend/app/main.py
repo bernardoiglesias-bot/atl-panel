@@ -512,7 +512,7 @@ def listar_docentes(db: Session = Depends(get_db), _: str = Depends(usuario)):
         "maquinaria": d.maquinaria, "sugerencias": d.sugerencias, "cupo_min": d.cupo_min, "cupo_max": d.cupo_max,
         "talleres": [{"id": t.id, "nombre": t.nombre, "dia_nombre": DIAS[t.dia], "desde": t.desde, "hasta": t.hasta,
                       "espacio": t.espacio.nombre if t.espacio else ""} for t in
-                     sorted((t for t in d.talleres if t.periodo == PERIODO_ACTUAL), key=lambda t: (t.dia, t.desde))],
+                     sorted((t for t in d.talleres if t.periodo == PERIODO_ACTUAL and t.activo), key=lambda t: (t.dia, t.desde))],
     } for d in docentes]
 
 
