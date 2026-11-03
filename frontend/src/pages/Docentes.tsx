@@ -4,14 +4,77 @@ import type { Docente } from '../tipos'
 
 type Personal = { id: number; nombre: string; funcion: string; email: string; telefono: string }
 
+const CAMPOS: [keyof FormDocente, string, boolean][] = [
+  ['nombre', 'Nombre y apellido', false],
+  ['dni', 'DNI', false],
+  ['email', 'Mail', false],
+  ['celular', 'Celular', false],
+  ['nacimiento', 'Fecha de nacimiento', false],
+  ['facturacion', 'Facturación', false],
+  ['cupo_min', 'Cupo mínimo', false],
+  ['cupo_max', 'Cupo máximo', false],
+  ['necesidades', 'Necesidades técnicas', true],
+  ['maquinaria', 'Estado de maquinaria', true],
+  ['sugerencias', 'Sugerencias', true],
+]
+type FormDocente = Omit<Docente, 'id' | 'talleres'>
+const VACIO: FormDocente = {
+  nombre: '', dni: '', email: '', celular: '', nacimiento: '', facturacion: '',
+  necesidades: '', maquinaria: '', sugerencias: '', cupo_min: '', cupo_max: '',
+}
+
+function FormularioDocente({ docente, onCerrar, onGuardado }: { docente: Docente | null; onCerrar: () => void; onGuardado: () => void }) {
+  const [f, setF] = useState<FormDocente>(() => (docente ? { ...VACIO, ...docente } : VACIO))
+  const [guardando, setGuardando] = useState(false)
+  async function guardar() {
+    if (!f.nombre.trim()) return
+    setGuardando(true)
+    try {
+      const body = JSON.stringify(f)
+      if (docente) await api(`/api/docentes/${docente.id}`, { method: 'PUT', body })
+      else await api('/api/docentes', { method: 'POST', body })
+      onGuardado()
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4" onClick={onCerrar}>
+      <div className="tarjeta w-full max-w-xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-medium text-marca-800">{docente ? 'Editar docente' : 'Nuevo docente'}</h3>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {CAMPOS.map(([k, etiqueta, largo]) => (
+            <label key={k} className={`text-sm ${largo ? 'sm:col-span-2' : ''}`}>
+              <span className="text-slate-500">{etiqueta}</span>
+              {largo ? (
+                <textarea className="campo mt-1" rows={2} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+              ) : (
+                <input className="campo mt-1" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+              )}
+            </label>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button className="boton-suave" onClick={onCerrar}>Cancelar</button>
+          <button className="boton" disabled={guardando || !f.nombre.trim()} onClick={guardar}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Docentes() {
   const [docentes, setDocentes] = useState<Docente[]>([])
   const [personal, setPersonal] = useState<Personal[]>([])
   const [q, setQ] = useState('')
   const [abierto, setAbierto] = useState<number | null>(null)
+  const [editando, setEditando] = useState<Docente | null | 'nuevo'>(null)
 
-  useEffect(() => {
+  function cargar() {
     api<Docente[]>('/api/docentes').then(setDocentes)
+  }
+  useEffect(() => {
+    cargar()
     api<Personal[]>('/api/personal').then(setPersonal)
   }, [])
 
@@ -25,7 +88,15 @@ export default function Docentes() {
       <div className="tarjeta p-4 flex flex-wrap gap-3 items-center">
         <input className="campo flex-1 min-w-[12rem]" placeholder="Buscar docente" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="text-sm text-slate-500">{lista.length} docentes</span>
+        <button className="boton" onClick={() => setEditando('nuevo')}>+ Nuevo docente</button>
       </div>
+      {editando !== null && (
+        <FormularioDocente
+          docente={editando === 'nuevo' ? null : editando}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => { setEditando(null); cargar() }}
+        />
+      )}
 
       <div className="grid md:grid-cols-2 gap-3">
         {lista.map((d) => (
@@ -69,6 +140,9 @@ export default function Docentes() {
                       <dd className="flex-1 text-slate-600">{v}</dd>
                     </div>
                   ))}
+                <div className="pt-2">
+                  <button className="boton-suave" onClick={() => setEditando(d)}>Editar datos</button>
+                </div>
               </dl>
             )}
           </div>
