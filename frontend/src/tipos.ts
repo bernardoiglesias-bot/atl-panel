@@ -183,8 +183,18 @@ export type Usuario = {
   usuario: string
   nombre: string
   activo: boolean
+  rol: string
   creado: string
   ultimo_ingreso: string | null
+}
+
+export type Cambio = {
+  id: number
+  fecha: string
+  usuario: string
+  accion: string
+  seccion: string
+  detalle: string
 }
 
 export type Indicador = { clave: string; texto: string; valor: number | null }

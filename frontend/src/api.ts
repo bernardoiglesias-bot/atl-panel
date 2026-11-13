@@ -12,10 +12,21 @@ export function getUsuario() {
   return localStorage.getItem('atl_usuario') || ''
 }
 
+export function getRol() {
+  return localStorage.getItem('atl_rol') || 'coordinacion'
+}
+
+export function esCoordinacion() {
+  return getRol() === 'coordinacion'
+}
+
+export const SOLO_COORDINACION = ['/tareas', '/gastos', '/feedback', '/objetivos', '/accesos', '/cambios']
+
 export function cerrarSesion() {
   localStorage.removeItem('atl_token')
   localStorage.removeItem('atl_nombre')
   localStorage.removeItem('atl_usuario')
+  localStorage.removeItem('atl_rol')
   location.reload()
 }
 
@@ -33,6 +44,7 @@ export async function login(nombre: string, password: string) {
   localStorage.setItem('atl_token', datos.token)
   localStorage.setItem('atl_nombre', datos.nombre)
   localStorage.setItem('atl_usuario', datos.usuario)
+  localStorage.setItem('atl_rol', datos.rol || 'coordinacion')
   return datos
 }
 

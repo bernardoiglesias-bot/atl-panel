@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
@@ -16,6 +16,10 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    columnas = {c["name"] for c in inspect(engine).get_columns("usuario")}
+    if "rol" not in columnas:
+        with engine.begin() as con:
+            con.execute(text("ALTER TABLE usuario ADD COLUMN rol VARCHAR(20) NOT NULL DEFAULT 'coordinacion'"))
 
 
 def get_db() -> Iterator[Session]:

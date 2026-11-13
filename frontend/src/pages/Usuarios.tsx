@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, getUsuario } from '../api'
 import type { Usuario } from '../tipos'
 
-const NUEVO = { usuario: '', nombre: '', password: '' }
+const NUEVO = { usuario: '', nombre: '', password: '', rol: 'administracion' }
+const ROLES: Record<string, string> = { coordinacion: 'Coordinación', administracion: 'Administración' }
 const CLAVES = { password_actual: '', password_nueva: '' }
 
 export default function Usuarios() {
@@ -71,7 +72,7 @@ export default function Usuarios() {
                 {u.nombre} {u.usuario === yo && <span className="text-xs text-slate-400">(vos)</span>}
               </p>
               <p className="text-sm text-slate-500">
-                {u.usuario} · {u.activo ? 'activo' : 'dado de baja'}
+                {u.usuario} · {ROLES[u.rol] || u.rol} · {u.activo ? 'activo' : 'dado de baja'}
                 {u.ultimo_ingreso ? ` · último ingreso ${u.ultimo_ingreso}` : ' · nunca entró'}
               </p>
             </div>
@@ -96,6 +97,10 @@ export default function Usuarios() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
+          <select className="campo" value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}>
+            <option value="administracion">Administración: agenda, plano, talleres, docentes, alumnos e insumos</option>
+            <option value="coordinacion">Coordinación: acceso completo</option>
+          </select>
           <button className="boton w-full justify-center" onClick={crear}>
             Crear acceso
           </button>

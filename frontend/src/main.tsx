@@ -1,10 +1,12 @@
-import { StrictMode } from 'react'
+import { StrictMode, type ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { Navigate, createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { esCoordinacion } from './api'
 import App from './App'
 import './index.css'
 import Agenda from './pages/Agenda'
 import Alumnos from './pages/Alumnos'
+import Cambios from './pages/Cambios'
 import Compras from './pages/Compras'
 import Docentes from './pages/Docentes'
 import Espacios from './pages/Espacios'
@@ -18,6 +20,10 @@ import Talleres from './pages/Talleres'
 import Tareas from './pages/Tareas'
 import Usuarios from './pages/Usuarios'
 
+function soloCoordinacion(elemento: ReactElement) {
+  return esCoordinacion() ? elemento : <Navigate to="/" replace />
+}
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -30,12 +36,13 @@ const router = createBrowserRouter([
       { path: 'docentes', element: <Docentes /> },
       { path: 'alumnos', element: <Alumnos /> },
       { path: 'espacios', element: <Espacios /> },
-      { path: 'tareas', element: <Tareas /> },
-      { path: 'gastos', element: <Gastos /> },
+      { path: 'tareas', element: soloCoordinacion(<Tareas />) },
+      { path: 'gastos', element: soloCoordinacion(<Gastos />) },
       { path: 'compras', element: <Compras /> },
-      { path: 'feedback', element: <Feedback /> },
-      { path: 'objetivos', element: <Objetivos /> },
-      { path: 'accesos', element: <Usuarios /> },
+      { path: 'feedback', element: soloCoordinacion(<Feedback />) },
+      { path: 'objetivos', element: soloCoordinacion(<Objetivos />) },
+      { path: 'accesos', element: soloCoordinacion(<Usuarios />) },
+      { path: 'cambios', element: soloCoordinacion(<Cambios />) },
     ],
   },
   { path: '/pedir', element: <Pedir /> },

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { cerrarSesion, getNombre, getToken, login } from './api'
+import { SOLO_COORDINACION, cerrarSesion, esCoordinacion, getNombre, getToken, login } from './api'
 
 const SECCIONES = [
   { to: '/', texto: 'Inicio', end: true },
@@ -16,6 +16,7 @@ const SECCIONES = [
   { to: '/feedback', texto: 'Feedback' },
   { to: '/objetivos', texto: 'Objetivos' },
   { to: '/accesos', texto: 'Accesos' },
+  { to: '/cambios', texto: 'Registro' },
 ]
 
 function Login({ onEntrar }: { onEntrar: () => void }) {
@@ -68,6 +69,8 @@ export default function App() {
 
   if (!autenticado) return <Login onEntrar={() => setAutenticado(true)} />
 
+  const secciones = esCoordinacion() ? SECCIONES : SECCIONES.filter((s) => !SOLO_COORDINACION.includes(s.to))
+
   return (
     <div className="min-h-screen">
       <header className="bg-marca-700 text-white sticky top-0 z-20 shadow">
@@ -77,7 +80,7 @@ export default function App() {
             <p className="text-xs text-marca-100">1º cuatrimestre 2026</p>
           </div>
           <nav className="hidden md:flex gap-1">
-            {SECCIONES.map((s) => (
+            {secciones.map((s) => (
               <NavLink
                 key={s.to}
                 to={s.to}
@@ -99,7 +102,7 @@ export default function App() {
         </div>
         {menuAbierto && (
           <nav className="md:hidden border-t border-white/20 px-4 pb-3 grid grid-cols-2 gap-1">
-            {SECCIONES.map((s) => (
+            {secciones.map((s) => (
               <NavLink
                 key={s.to}
                 to={s.to}

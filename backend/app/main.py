@@ -1,9 +1,10 @@
+import json
 import os
 from datetime import date, datetime, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from .db import DB_PATH, SessionLocal, get_db, init_db
 from .models import (
     PERIODO_ACTUAL,
     Alumno,
+    Cambio,
     Docente,
     Espacio,
     Evento,
@@ -76,13 +78,31 @@ def crear_usuario_inicial(db: Session) -> None:
     db.commit()
 
 
-def usuario(request: Request) -> str:
+ROLES = ("coordinacion", "administracion")
+
+
+def _token_de(request: Request) -> str:
     auth = request.headers.get("authorization", "")
-    token = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token", "")
+    return auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token", "")
+
+
+def usuario(request: Request) -> str:
     try:
-        return signer.loads(token, max_age=60 * 60 * HORAS_SESION)
+        return signer.loads(_token_de(request), max_age=60 * 60 * HORAS_SESION)
     except BadSignature:
         raise HTTPException(status_code=401, detail="Sesión no válida")
+
+
+def rol_de(db: Session, nombre_usuario: str) -> str:
+    u = buscar_usuario(db, nombre_usuario)
+    return u.rol if u and u.activo else ""
+
+
+def coordinador(db: Session = Depends(get_db), quien: str = Depends(usuario)) -> str:
+    """Sólo coordinación: administración no entra a gastos, tareas, feedback, objetivos ni accesos."""
+    if rol_de(db, quien) != "coordinacion":
+        raise HTTPException(status_code=403, detail="Tu usuario no tiene acceso a esta sección")
+    return quien
 
 
 class LoginIn(BaseModel):
@@ -94,6 +114,7 @@ class UsuarioIn(BaseModel):
     usuario: str
     nombre: str
     password: str
+    rol: str = "coordinacion"
 
 
 class ClaveIn(BaseModel):
@@ -102,7 +123,7 @@ class ClaveIn(BaseModel):
 
 
 def usuario_out(u: Usuario):
-    return {"id": u.id, "usuario": u.usuario, "nombre": u.nombre, "activo": u.activo,
+    return {"id": u.id, "usuario": u.usuario, "nombre": u.nombre, "activo": u.activo, "rol": u.rol,
             "creado": u.creado.isoformat(), "ultimo_ingreso": u.ultimo_ingreso.isoformat() if u.ultimo_ingreso else None}
 
 
@@ -126,25 +147,28 @@ def login(datos: LoginIn, request: Request, db: Session = Depends(get_db)):
     limpiar_intentos(llave)
     u.ultimo_ingreso = date.today()
     db.commit()
-    return {"token": signer.dumps(u.usuario), "nombre": u.nombre, "usuario": u.usuario,
+    return {"token": signer.dumps(u.usuario), "nombre": u.nombre, "usuario": u.usuario, "rol": u.rol,
             "horas_sesion": HORAS_SESION}
 
 
 @app.get("/api/usuarios")
-def listar_usuarios(db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_usuarios(db: Session = Depends(get_db), _: str = Depends(coordinador)):
     return [usuario_out(u) for u in db.scalars(select(Usuario).order_by(Usuario.nombre))]
 
 
 @app.post("/api/usuarios")
-def crear_usuario(datos: UsuarioIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def crear_usuario(datos: UsuarioIn, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     nombre_usuario = datos.usuario.strip().lower()
+    if datos.rol not in ROLES:
+        raise HTTPException(400, "Rol desconocido")
     if len(nombre_usuario) < 3:
         raise HTTPException(400, "El usuario necesita al menos 3 letras")
     if len(datos.password) < 8:
         raise HTTPException(400, "La contraseña necesita al menos 8 caracteres")
     if buscar_usuario(db, nombre_usuario):
         raise HTTPException(400, "Ya existe ese usuario")
-    u = Usuario(usuario=nombre_usuario, nombre=datos.nombre.strip() or nombre_usuario, clave=hash_clave(datos.password))
+    u = Usuario(usuario=nombre_usuario, nombre=datos.nombre.strip() or nombre_usuario,
+                clave=hash_clave(datos.password), rol=datos.rol)
     db.add(u)
     db.commit()
     return usuario_out(u)
@@ -163,7 +187,7 @@ def cambiar_clave(datos: ClaveIn, db: Session = Depends(get_db), quien: str = De
 
 
 @app.delete("/api/usuarios/{usuario_id}")
-def desactivar_usuario(usuario_id: int, db: Session = Depends(get_db), quien: str = Depends(usuario)):
+def desactivar_usuario(usuario_id: int, db: Session = Depends(get_db), quien: str = Depends(coordinador)):
     u = db.get(Usuario, usuario_id)
     if not u:
         raise HTTPException(404, "No existe")
@@ -172,6 +196,77 @@ def desactivar_usuario(usuario_id: int, db: Session = Depends(get_db), quien: st
     u.activo = False
     db.commit()
     return usuario_out(u)
+
+
+# ------------------------------------------------------- registro de cambios
+SECCIONES_REGISTRO = {
+    "usuarios": "Accesos", "eventos": "Agenda", "excepciones": "Agenda", "espacios": "Espacios",
+    "talleres": "Talleres", "planificacion": "Plano 2027", "docentes": "Docentes", "alumnos": "Alumnos",
+    "inscripciones": "Alumnos", "tareas": "Tareas", "gastos": "Gastos", "feedback": "Feedback",
+    "objetivos": "Objetivos", "pedidos": "Insumos", "publico": "Insumos (link del personal)",
+}
+ACCIONES = {"POST": "Alta", "PUT": "Edición", "DELETE": "Baja"}
+_OCULTAR = ("password", "clave")
+
+
+def _resumir(cuerpo: bytes) -> str:
+    try:
+        datos = json.loads(cuerpo or b"{}")
+    except ValueError:
+        return ""
+    if isinstance(datos, dict):
+        datos = {k: v for k, v in datos.items() if not any(o in k.lower() for o in _OCULTAR) and v not in ("", None, [])}
+    texto = json.dumps(datos, ensure_ascii=False)
+    return texto if len(texto) <= 1500 else texto[:1500] + "…"
+
+
+@app.middleware("http")
+async def registrar_cambios(request: Request, call_next):
+    partes = request.url.path.strip("/").split("/")
+    if request.method not in ACCIONES or len(partes) < 2 or partes[0] != "api" or partes[1] == "login":
+        return await call_next(request)
+    cuerpo = await request.body()
+    respuesta = await call_next(request)
+    if respuesta.status_code >= 400:
+        return respuesta
+    try:
+        quien = signer.loads(_token_de(request), max_age=60 * 60 * HORAS_SESION)
+    except BadSignature:
+        quien = ""
+    accion = ACCIONES[request.method]
+    if partes[1] == "publico":
+        try:
+            quien = f"{json.loads(cuerpo).get('pedido_por', '')} (link del personal)"
+        except (ValueError, AttributeError):
+            quien = "link del personal"
+    if partes[1] == "usuarios" and partes[-1] == "clave":
+        accion = "Cambio de contraseña"
+    if partes[1] == "pedidos" and partes[-1] == "estado":
+        accion = "Cambio de estado"
+    db = SessionLocal()
+    try:
+        db.add(Cambio(fecha=datetime.now().isoformat(timespec="seconds", sep=" "), usuario=quien or "?",
+                      accion=accion, seccion=SECCIONES_REGISTRO.get(partes[1], partes[1]),
+                      ruta=request.url.path, detalle=_resumir(cuerpo)))
+        db.commit()
+    finally:
+        db.close()
+    return respuesta
+
+
+@app.get("/api/cambios")
+def listar_cambios(usuario_filtro: str = "", seccion: str = "", limite: int = 300,
+                   db: Session = Depends(get_db), _: str = Depends(coordinador)):
+    q = select(Cambio)
+    if usuario_filtro:
+        q = q.where(Cambio.usuario == usuario_filtro)
+    if seccion:
+        q = q.where(Cambio.seccion == seccion)
+    filas = db.scalars(q.order_by(Cambio.id.desc()).limit(min(limite, 2000))).all()
+    usuarios = sorted({c for c in db.scalars(select(Cambio.usuario).distinct())})
+    secciones = sorted({c for c in db.scalars(select(Cambio.seccion).distinct())})
+    return {"cambios": [{"id": c.id, "fecha": c.fecha, "usuario": c.usuario, "accion": c.accion, "seccion": c.seccion,
+                         "detalle": c.detalle} for c in filas], "usuarios": usuarios, "secciones": secciones}
 
 
 @app.get("/healthz")
@@ -664,7 +759,7 @@ def tarea_out(t: Tarea):
 
 
 @app.get("/api/tareas")
-def listar_tareas(estado: str = "", plazo: str = "", db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_tareas(estado: str = "", plazo: str = "", db: Session = Depends(get_db), _: str = Depends(coordinador)):
     q = select(Tarea).options(selectinload(Tarea.espacio), selectinload(Tarea.objetivo))
     if estado:
         q = q.where(Tarea.estado == estado)
@@ -677,7 +772,7 @@ def listar_tareas(estado: str = "", plazo: str = "", db: Session = Depends(get_d
 
 
 @app.post("/api/tareas")
-def crear_tarea(datos: TareaIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+def crear_tarea(datos: TareaIn, db: Session = Depends(get_db), u: str = Depends(coordinador)):
     t = Tarea(**datos.model_dump(), creada=date.today())
     if not t.responsable:
         t.responsable = u
@@ -687,7 +782,7 @@ def crear_tarea(datos: TareaIn, db: Session = Depends(get_db), u: str = Depends(
 
 
 @app.put("/api/tareas/{tarea_id}")
-def editar_tarea(tarea_id: int, datos: TareaIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def editar_tarea(tarea_id: int, datos: TareaIn, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     t = db.get(Tarea, tarea_id)
     if not t:
         raise HTTPException(404, "No existe")
@@ -706,7 +801,7 @@ def editar_tarea(tarea_id: int, datos: TareaIn, db: Session = Depends(get_db), _
 
 
 @app.delete("/api/tareas/{tarea_id}")
-def borrar_tarea(tarea_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def borrar_tarea(tarea_id: int, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     t = db.get(Tarea, tarea_id)
     if t:
         db.delete(t)
@@ -744,7 +839,7 @@ def gasto_out(g: Gasto):
 
 
 @app.get("/api/gastos")
-def listar_gastos(etapa: str = "", db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_gastos(etapa: str = "", db: Session = Depends(get_db), _: str = Depends(coordinador)):
     q = select(Gasto).options(selectinload(Gasto.espacio)).order_by(Gasto.fecha.desc(), Gasto.id.desc())
     if etapa:
         q = q.where(Gasto.etapa == etapa)
@@ -762,7 +857,7 @@ def listar_gastos(etapa: str = "", db: Session = Depends(get_db), _: str = Depen
 
 
 @app.post("/api/gastos")
-def crear_gasto(datos: GastoIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+def crear_gasto(datos: GastoIn, db: Session = Depends(get_db), u: str = Depends(coordinador)):
     g = Gasto(**datos.model_dump(), fecha=date.today())
     if not g.solicitante:
         g.solicitante = u
@@ -772,7 +867,7 @@ def crear_gasto(datos: GastoIn, db: Session = Depends(get_db), u: str = Depends(
 
 
 @app.put("/api/gastos/{gasto_id}")
-def editar_gasto(gasto_id: int, datos: GastoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def editar_gasto(gasto_id: int, datos: GastoIn, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     g = db.get(Gasto, gasto_id)
     if not g:
         raise HTTPException(404, "No existe")
@@ -793,7 +888,7 @@ def editar_gasto(gasto_id: int, datos: GastoIn, db: Session = Depends(get_db), _
 
 
 @app.delete("/api/gastos/{gasto_id}")
-def borrar_gasto(gasto_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def borrar_gasto(gasto_id: int, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     g = db.get(Gasto, gasto_id)
     if g:
         db.delete(g)
@@ -824,7 +919,7 @@ def feedback_out(f: Feedback):
 
 
 @app.get("/api/feedback")
-def listar_feedback(docente_id: int | None = None, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_feedback(docente_id: int | None = None, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     q = select(Feedback).options(selectinload(Feedback.docente), selectinload(Feedback.personal))
     if docente_id:
         q = q.where(Feedback.docente_id == docente_id)
@@ -833,7 +928,7 @@ def listar_feedback(docente_id: int | None = None, db: Session = Depends(get_db)
 
 
 @app.post("/api/feedback")
-def crear_feedback(datos: FeedbackIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+def crear_feedback(datos: FeedbackIn, db: Session = Depends(get_db), u: str = Depends(coordinador)):
     cuerpo = datos.model_dump()
     cuerpo["fecha"] = cuerpo["fecha"] or date.today()
     f = Feedback(**cuerpo, registrado_por=u)
@@ -843,7 +938,7 @@ def crear_feedback(datos: FeedbackIn, db: Session = Depends(get_db), u: str = De
 
 
 @app.put("/api/feedback/{feedback_id}")
-def editar_feedback(feedback_id: int, datos: FeedbackIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def editar_feedback(feedback_id: int, datos: FeedbackIn, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     f = db.get(Feedback, feedback_id)
     if not f:
         raise HTTPException(404, "No existe")
@@ -861,7 +956,7 @@ def editar_feedback(feedback_id: int, datos: FeedbackIn, db: Session = Depends(g
 
 
 @app.delete("/api/feedback/{feedback_id}")
-def borrar_feedback(feedback_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def borrar_feedback(feedback_id: int, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     f = db.get(Feedback, feedback_id)
     if f:
         db.delete(f)
@@ -948,12 +1043,12 @@ def objetivo_out(o: Objetivo, db: Session):
 
 
 @app.get("/api/indicadores")
-def listar_indicadores(db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_indicadores(db: Session = Depends(get_db), _: str = Depends(coordinador)):
     return [{"clave": c, "texto": t, "valor": valor_indicador(c, db)} for c, t in INDICADORES]
 
 
 @app.get("/api/objetivos")
-def listar_objetivos(db: Session = Depends(get_db), _: str = Depends(usuario)):
+def listar_objetivos(db: Session = Depends(get_db), _: str = Depends(coordinador)):
     objetivos = db.scalars(
         select(Objetivo).options(selectinload(Objetivo.tareas), selectinload(Objetivo.seguimientos))
         .order_by(Objetivo.estado, Objetivo.vence)
@@ -962,7 +1057,7 @@ def listar_objetivos(db: Session = Depends(get_db), _: str = Depends(usuario)):
 
 
 @app.post("/api/objetivos")
-def crear_objetivo(datos: ObjetivoIn, db: Session = Depends(get_db), u: str = Depends(usuario)):
+def crear_objetivo(datos: ObjetivoIn, db: Session = Depends(get_db), u: str = Depends(coordinador)):
     o = Objetivo(**datos.model_dump())
     if not o.responsable:
         o.responsable = u
@@ -974,7 +1069,7 @@ def crear_objetivo(datos: ObjetivoIn, db: Session = Depends(get_db), u: str = De
 
 
 @app.put("/api/objetivos/{objetivo_id}")
-def editar_objetivo(objetivo_id: int, datos: ObjetivoIn, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def editar_objetivo(objetivo_id: int, datos: ObjetivoIn, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     o = db.get(Objetivo, objetivo_id)
     if not o:
         raise HTTPException(404, "No existe")
@@ -993,7 +1088,7 @@ def editar_objetivo(objetivo_id: int, datos: ObjetivoIn, db: Session = Depends(g
 
 
 @app.delete("/api/objetivos/{objetivo_id}")
-def borrar_objetivo(objetivo_id: int, db: Session = Depends(get_db), _: str = Depends(usuario)):
+def borrar_objetivo(objetivo_id: int, db: Session = Depends(get_db), _: str = Depends(coordinador)):
     o = db.get(Objetivo, objetivo_id)
     if o:
         db.delete(o)
@@ -1003,7 +1098,7 @@ def borrar_objetivo(objetivo_id: int, db: Session = Depends(get_db), _: str = De
 
 @app.post("/api/objetivos/{objetivo_id}/seguimientos")
 def crear_seguimiento(objetivo_id: int, datos: SeguimientoIn, db: Session = Depends(get_db),
-                      _: str = Depends(usuario)):
+                      _: str = Depends(coordinador)):
     o = db.get(Objetivo, objetivo_id)
     if not o:
         raise HTTPException(404, "No existe")
@@ -1133,7 +1228,16 @@ def crear_pedido_publico(c: str, datos: PedidoIn, db: Session = Depends(get_db))
 
 # ---------------------------------------------------------------- resumen
 @app.get("/api/resumen")
-def resumen(db: Session = Depends(get_db), _: str = Depends(usuario)):
+def resumen(db: Session = Depends(get_db), quien: str = Depends(usuario)):
+    datos = resumen_db(db)
+    if rol_de(db, quien) != "coordinacion":
+        for k in ("tareas", "gastos", "objetivos_en_curso", "feedback_registrados"):
+            datos.pop(k, None)
+    datos["rol"] = rol_de(db, quien)
+    return datos
+
+
+def resumen_db(db: Session):
     talleres = db.scalars(select(Taller).options(selectinload(Taller.espacio)).where(Taller.activo, Taller.periodo == PERIODO_ACTUAL)).all()
     insc = conteos(db)
     alumnos = db.scalars(select(Alumno)).all()

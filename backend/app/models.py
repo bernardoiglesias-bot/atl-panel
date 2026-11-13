@@ -21,8 +21,22 @@ class Usuario(Base):
     nombre: Mapped[str] = mapped_column(String(120))
     clave: Mapped[str] = mapped_column(String(200))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    rol: Mapped[str] = mapped_column(String(20), default="coordinacion")  # coordinacion, administracion
     creado: Mapped[date] = mapped_column(Date, default=date.today)
     ultimo_ingreso: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class Cambio(Base):
+    """Registro de cada modificación hecha desde el panel: quién, cuándo y qué."""
+
+    __tablename__ = "cambio"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fecha: Mapped[str] = mapped_column(String(19))
+    usuario: Mapped[str] = mapped_column(String(120))
+    accion: Mapped[str] = mapped_column(String(20))
+    seccion: Mapped[str] = mapped_column(String(40))
+    ruta: Mapped[str] = mapped_column(String(200))
+    detalle: Mapped[str] = mapped_column(Text, default="")
 
 
 class Espacio(Base):
