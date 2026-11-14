@@ -13,6 +13,7 @@ import Espacios from './pages/Espacios'
 import Feedback from './pages/Feedback'
 import Gastos from './pages/Gastos'
 import Inicio from './pages/Inicio'
+import MiClave from './pages/MiClave'
 import Objetivos from './pages/Objetivos'
 import Pedir from './pages/Pedir'
 import Plano from './pages/Plano'
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
       { path: 'feedback', element: soloCoordinacion(<Feedback />) },
       { path: 'objetivos', element: soloCoordinacion(<Objetivos />) },
       { path: 'accesos', element: soloCoordinacion(<Usuarios />) },
+      { path: 'mi-clave', element: <MiClave /> },
       { path: 'cambios', element: soloCoordinacion(<Cambios />) },
     ],
   },

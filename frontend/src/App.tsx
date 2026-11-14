@@ -93,9 +93,14 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
-          <button className="hidden md:block text-xs text-marca-100 hover:text-white" onClick={cerrarSesion}>
-            {getNombre()} · salir
-          </button>
+          <div className="hidden md:flex items-center gap-2 text-xs text-marca-100">
+            <NavLink to="/mi-clave" className="hover:text-white">
+              {getNombre()} · mi contraseña
+            </NavLink>
+            <button className="hover:text-white" onClick={cerrarSesion}>
+              · salir
+            </button>
+          </div>
           <button className="md:hidden rounded-lg border border-white/30 px-3 py-1.5 text-sm" onClick={() => setMenuAbierto(!menuAbierto)}>
             Menú
           </button>
@@ -115,6 +120,9 @@ export default function App() {
                 {s.texto}
               </NavLink>
             ))}
+            <NavLink to="/mi-clave" onClick={() => setMenuAbierto(false)} className="rounded-lg px-3 py-2 text-sm hover:bg-marca-600">
+              Mi contraseña
+            </NavLink>
             <button className="rounded-lg px-3 py-2 text-left text-sm hover:bg-marca-600" onClick={cerrarSesion}>
               Salir
             </button>
