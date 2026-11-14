@@ -33,6 +33,7 @@ from .models import (
 )
 from .respaldo import arrancar as arrancar_respaldo
 from .seed import cargar
+from .whatsapp import normalizar_celular
 from .seguridad import (
     HORAS_SESION,
     bloqueo_restante,
@@ -1298,6 +1299,40 @@ def resumen_db(db: Session):
         "hoy": {"fecha": date.today().isoformat(), "dia_nombre": DIAS[date.today().weekday()],
                 "clases": len([t for t in talleres if t.dia == date.today().weekday()])},
         "actualizado": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+# --------------------------------------------------------------- whatsapp
+@app.get("/api/whatsapp/listas")
+def listas_whatsapp(periodo: str = PERIODO_ACTUAL, db: Session = Depends(get_db), _: str = Depends(usuario)):
+    talleres = db.scalars(
+        select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente),
+                               selectinload(Taller.inscripciones).selectinload(Inscripcion.alumno))
+        .where(Taller.periodo == periodo, Taller.activo).order_by(Taller.dia, Taller.desde, Taller.nombre)
+    ).all()
+    alumnos = db.scalars(select(Alumno).order_by(Alumno.nombre)).all()
+    celulares = {a.id: normalizar_celular(a.telefono) for a in alumnos}
+
+    def contacto(a: Alumno):
+        numero, motivo = celulares[a.id]
+        return {"id": a.id, "nombre": a.nombre, "telefono": a.telefono, "celular": numero, "motivo": motivo}
+
+    etiquetas: dict[int, list[str]] = {}
+    salida = []
+    for t in talleres:
+        etiqueta = f"ATL {DIAS[t.dia][:3]} {t.desde.replace(':', '.')} {t.nombre}"
+        inscriptos = sorted({i.alumno.id: i.alumno for i in t.inscripciones}.values(), key=lambda a: a.nombre)
+        for a in inscriptos:
+            etiquetas.setdefault(a.id, []).append(etiqueta)
+        salida.append({"id": t.id, "nombre": t.nombre, "area": t.area, "dia_nombre": DIAS[t.dia],
+                       "desde": t.desde, "hasta": t.hasta, "estado": t.estado,
+                       "espacio": t.espacio.nombre if t.espacio else "",
+                       "docente": t.docente.nombre if t.docente else t.docente_texto,
+                       "etiqueta": etiqueta, "alumnos": [contacto(a) for a in inscriptos]})
+    return {
+        "periodo": periodo,
+        "talleres": salida,
+        "contactos": [{**contacto(a), "etiquetas": etiquetas.get(a.id, [])} for a in alumnos if a.telefono.strip()],
     }
 
 

@@ -10,6 +10,7 @@ const SECCIONES = [
   { to: '/docentes', texto: 'Docentes' },
   { to: '/alumnos', texto: 'Alumnos' },
   { to: '/espacios', texto: 'Espacios' },
+  { to: '/whatsapp', texto: 'WhatsApp' },
   { to: '/tareas', texto: 'Tareas' },
   { to: '/gastos', texto: 'Gastos' },
   { to: '/compras', texto: 'Insumos' },
