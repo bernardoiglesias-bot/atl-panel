@@ -38,7 +38,7 @@ def normalizar_celular(texto: str) -> tuple[str | None, str]:
     numero, motivo = _normalizar(partes[0])
     if numero or len(partes) == 1:
         return numero, motivo
-    if len(re.sub(r"\D", "", partes[0])) <= 4:
+    if len(re.sub(r"\D", "", partes[0])) < 7:
         unido = _normalizar(primero)
         if unido[0]:
             return unido
