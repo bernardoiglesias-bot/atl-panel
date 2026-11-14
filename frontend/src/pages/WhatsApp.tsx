@@ -16,7 +16,12 @@ const HORARIO = '[lunes a viernes de 9 a 13 y de 16 a 20]'
 
 const INSCRIPCION_2027 = '*Inscripción 2027*\n• Hasta el 20/12/2026: $57.000\n• Desde febrero 2027: $70.000'
 const CUOTAS_2027 =
-  '*Cuota mensual 2027*\n• Talleres de 3 hs: $70.000 ($64.000 pagando hasta el 10 de cada mes)\n• Talleres de 2 hs: $56.000 ($51.000 pagando hasta el 10 de cada mes)'
+  '*Cuota mensual 2027*\n• Talleres de 3 hs semanales: $70.000 ($64.000 pagando hasta el 10 de cada mes)\n• Talleres de 2 hs semanales: $56.000 ($51.000 pagando hasta el 10 de cada mes)'
+const DESCUENTOS = '*Descuento del 10% en la cuota* si cursás dos o más talleres o si sos parte de la comunidad UNCuyo.'
+const FORMAS_PAGO =
+  '*Formas de pago:* transferencia bancaria, Mercado Pago, tarjeta de crédito o de débito. *No se reciben pagos en efectivo.*'
+const DATOS_TRANSFERENCIA =
+  '*Datos para transferir*\nAlias: FUNC.EXTENSION\nCBU: 0340060900100586822000\nCuenta: CC $ 060-100586822-000\nCUIT: 30-63044155-9\nBanco Patagonia'
 
 const PERFIL: Texto[] = [
   { titulo: 'Nombre de la empresa', donde: 'Herramientas para la empresa → Perfil de la empresa → Nombre', texto: 'Aulas para el Tiempo Libre - UNCuyo' },
@@ -68,7 +73,15 @@ const RAPIDAS: Texto[] = [
       INSCRIPCION_2027 +
       '\n\n' +
       CUOTAS_2027 +
-      '\n\nSe puede pagar [medios de pago].\n\nCuando pagues, mandanos por acá la *foto del comprobante* con tu nombre completo y el taller.',
+      '\n\n' +
+      DESCUENTOS +
+      '\n\n' +
+      FORMAS_PAGO +
+      '\n\nCuando pagues, mandanos por acá la *foto del comprobante* con tu nombre completo y el taller.',
+  },
+  {
+    atajo: 'transferencia', titulo: 'Datos para transferir',
+    texto: DATOS_TRANSFERENCIA + '\n\nCuando transfieras, mandanos por acá la *foto del comprobante* con tu nombre completo y el taller.',
   },
   { atajo: 'comprobante', titulo: 'Comprobante recibido', texto: '¡Gracias! Recibimos tu comprobante y lo registramos. Si hubiera algún problema, te avisamos por acá.' },
   { atajo: 'sede', titulo: 'Dónde estamos', texto: 'Estamos en [calle y número de la sede], Mendoza. Las aulas están numeradas; si es tu primera clase, preguntá en la entrada y te indicamos cuál es la tuya.' },
@@ -111,7 +124,11 @@ const COMUNICADOS: Texto[] = [
       INSCRIPCION_2027 +
       '\n\n' +
       CUOTAS_2027 +
-      '\n\n*Medios de pago:* [medios de pago].\n\nLos cupos son limitados. Te compartimos la grilla completa en los próximos mensajes. Cualquier duda, escribinos por acá.',
+      '\n\n' +
+      DESCUENTOS +
+      '\n\n' +
+      FORMAS_PAGO +
+      '\n\nLos cupos son limitados. Te compartimos la grilla completa en los próximos mensajes. Cualquier duda, escribinos por acá.',
   },
   {
     titulo: '5. Inicio de clases',
