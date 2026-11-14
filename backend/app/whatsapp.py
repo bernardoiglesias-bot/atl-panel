@@ -4,12 +4,8 @@ import re
 CARACTERISTICA_LOCAL = "261"
 
 
-def normalizar_celular(texto: str) -> tuple[str | None, str]:
-    """Devuelve (número para wa.me, motivo si no se pudo usar)."""
-    if not (texto or "").strip():
-        return None, "Sin teléfono"
-    primero = re.split(r"/|,|;|\s+-\s+|\s+y\s+|\s+o\s+", texto.strip())[0]
-    d = re.sub(r"\D", "", primero)
+def _normalizar(texto: str) -> tuple[str | None, str]:
+    d = re.sub(r"\D", "", texto)
     if d.startswith("00"):
         d = d[2:]
     if d.startswith("54") and len(d) >= 12:
@@ -30,3 +26,15 @@ def normalizar_celular(texto: str) -> tuple[str | None, str]:
     if len(d) != 10:
         return None, "Le faltan o le sobran números"
     return "549" + d, ""
+
+
+def normalizar_celular(texto: str) -> tuple[str | None, str]:
+    """Devuelve (número para wa.me, motivo si no se pudo usar)."""
+    texto = (texto or "").strip()
+    if not texto:
+        return None, "Sin teléfono"
+    numero, motivo = _normalizar(texto)
+    if numero:
+        return numero, motivo
+    primero = re.split(r"/|,|;|\s+-\s+|\s+y\s+|\s+o\s+", texto)[0]
+    return _normalizar(primero) if primero != texto else (numero, motivo)
