@@ -29,12 +29,17 @@ def _normalizar(texto: str) -> tuple[str | None, str]:
 
 
 def normalizar_celular(texto: str) -> tuple[str | None, str]:
-    """Devuelve (número para wa.me, motivo si no se pudo usar)."""
+    """Devuelve (número para wa.me, motivo si no se pudo usar). Si hay varios números, usa el primero."""
     texto = (texto or "").strip()
     if not texto:
         return None, "Sin teléfono"
-    numero, motivo = _normalizar(texto)
-    if numero:
+    primero = re.split(r"/|,|;|\s+y\s+|\s+o\s+", texto)[0]
+    partes = re.split(r"\s+-\s+", primero)
+    numero, motivo = _normalizar(partes[0])
+    if numero or len(partes) == 1:
         return numero, motivo
-    primero = re.split(r"/|,|;|\s+-\s+|\s+y\s+|\s+o\s+", texto)[0]
-    return _normalizar(primero) if primero != texto else (numero, motivo)
+    if len(re.sub(r"\D", "", partes[0])) <= 4:
+        unido = _normalizar(primero)
+        if unido[0]:
+            return unido
+    return numero, motivo
