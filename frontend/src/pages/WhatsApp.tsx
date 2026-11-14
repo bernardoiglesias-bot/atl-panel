@@ -183,10 +183,22 @@ function descargar(nombre: string, contenido: string, tipo: string) {
 
 const nombreAgenda = (c: Contacto) => `${c.nombre} ATL`
 
-function vcf(contactos: Contacto[]) {
+const escaparVcf = (v: string) => v.replace(/[\\,;]/g, (x) => `\\${x}`)
+
+function vcf<C extends Contacto>(contactos: C[], etiquetas: (c: C) => string[]) {
   return contactos
     .filter((c) => c.celular)
-    .map((c) => ['BEGIN:VCARD', 'VERSION:3.0', `FN:${nombreAgenda(c)}`, `N:${nombreAgenda(c)};;;;`, `TEL;TYPE=CELL:+${c.celular}`, 'END:VCARD'].join('\r\n'))
+    .map((c) =>
+      [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `FN:${nombreAgenda(c)}`,
+        `N:${nombreAgenda(c)};;;;`,
+        `TEL;TYPE=CELL:+${c.celular}`,
+        `CATEGORIES:${['ATL', ...etiquetas(c)].map(escaparVcf).join(',')}`,
+        'END:VCARD',
+      ].join('\r\n'),
+    )
     .join('\r\n')
 }
 
@@ -232,7 +244,7 @@ function TallerLista({ t, enviados, marcar }: { t: Lista; enviados: Set<number>;
         <div className="border-t border-slate-100 p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
             <BotonCopiar texto={conWa.map(nombreAgenda).join('\n')} etiqueta="Copiar nombres (para armar la difusión)" />
-            <button className="boton-suave py-1" onClick={() => descargar(`ATL ${t.dia_nombre} ${t.desde.replace(':', '.')} ${t.nombre}.vcf`, vcf(conWa), 'text/vcard')}>
+            <button className="boton-suave py-1" onClick={() => descargar(`ATL ${t.dia_nombre} ${t.desde.replace(':', '.')} ${t.nombre}.vcf`, vcf(conWa, () => [t.etiqueta]), 'text/vcard')}>
               Descargar contactos del taller
             </button>
           </div>
@@ -324,7 +336,7 @@ function ListasPorTaller() {
         <input className="campo flex-1 min-w-48" placeholder="Buscar taller, docente o día" value={q} onChange={(e) => setQ(e.target.value)} />
         {datos && (
           <>
-            <button className="boton" onClick={() => descargar('Contactos ATL.vcf', vcf(conWa), 'text/vcard')}>Contactos (.vcf)</button>
+            <button className="boton" onClick={() => descargar('Contactos ATL.vcf', vcf(conWa, (c) => c.etiquetas), 'text/vcard')}>Contactos (.vcf)</button>
             <button className="boton-suave" onClick={() => descargar('Contactos ATL Google.csv', csvGoogle(conWa), 'text/csv')}>Contactos para Google (.csv)</button>
           </>
         )}
