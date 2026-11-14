@@ -20,6 +20,7 @@ import Plano from './pages/Plano'
 import Talleres from './pages/Talleres'
 import Tareas from './pages/Tareas'
 import Usuarios from './pages/Usuarios'
+import WhatsApp from './pages/WhatsApp'
 
 function soloCoordinacion(elemento: ReactElement) {
   return esCoordinacion() ? elemento : <Navigate to="/" replace />
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'docentes', element: <Docentes /> },
       { path: 'alumnos', element: <Alumnos /> },
       { path: 'espacios', element: <Espacios /> },
+      { path: 'whatsapp', element: <WhatsApp /> },
       { path: 'tareas', element: soloCoordinacion(<Tareas />) },
       { path: 'gastos', element: soloCoordinacion(<Gastos />) },
       { path: 'compras', element: <Compras /> },
