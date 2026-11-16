@@ -64,7 +64,11 @@ const RAPIDAS: Texto[] = [
   { atajo: 'datos', titulo: 'Pedir datos', texto: 'Para ayudarte mejor, ¿nos pasás tu *nombre completo*, tu *DNI* y el *taller* al que vas o que te interesa?' },
   {
     atajo: 'inscripcion', titulo: 'Inscripciones 2027',
-    texto: 'Ya están abiertas las inscripciones 2027. Te podés inscribir [en la sede / en este link: ...]. Necesitás tu DNI y elegir el taller y el horario.\n\n' +
+    texto: 'Ya están abiertas las inscripciones 2027. Te podés inscribir *en la sede* (' +
+      DIRECCION +
+      '), de ' +
+      HORARIO +
+      '. Necesitás tu DNI y elegir el taller y el horario.\n\n' +
       INSCRIPCION_2027 +
       '\n\nSi querés, te pasamos la grilla de talleres.',
   },
@@ -130,7 +134,11 @@ const COMUNICADOS: Texto[] = [
     titulo: '3. Inscripciones 2027',
     donde: 'Canal + listas de difusión. Repetirlo unos días antes del 20/12 (fin del precio promocional) y al reabrir en febrero.',
     texto:
-      '*Inscripciones 2027 - Aulas para el Tiempo Libre*\n\nYa podés elegir tus talleres para 2027.\n\n*Cómo:* [en la sede / en este link: ...].\n*Qué necesitás:* DNI y el nombre, día y horario del taller.\n\n' +
+      '*Inscripciones 2027 - Aulas para el Tiempo Libre*\n\nYa podés elegir tus talleres para 2027.\n\n*Dónde:* en la sede, ' +
+      DIRECCION +
+      ', de ' +
+      HORARIO +
+      '.\n*Qué necesitás:* DNI y el nombre, día y horario del taller.\n\n' +
       INSCRIPCION_2027 +
       '\n\n' +
       CUOTAS_2027 +
