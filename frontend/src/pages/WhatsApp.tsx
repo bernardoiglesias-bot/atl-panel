@@ -12,7 +12,7 @@ type Lista = {
 type Listas = { periodo: string; talleres: Lista[]; contactos: (Contacto & { etiquetas: string[] })[] }
 type Texto = { titulo: string; donde?: string; texto: string; atajo?: string }
 
-const HORARIO = 'lunes a viernes de 9 a 13 y de 16 a 20 hs'
+const HORARIO = 'lunes a viernes de 9 a 13 y de 16 a 20 hs, y sábados de 9 a 12 hs'
 const DIRECCION = 'Paso de los Andes 640, Ciudad de Mendoza'
 const MAIL = 'comunicacion.atluncu@gmail.com'
 const WEB = 'https://aulastiempolibre.uncuyo.edu.ar/'
@@ -37,7 +37,7 @@ const PERFIL: Texto[] = [
     texto:
       'Talleres de idiomas, artes visuales, música, danza, diseño, informática, bienestar y cultura general para personas adultas. Un programa de la Universidad Nacional de Cuyo.\n\nPor este WhatsApp oficial te informamos inscripciones, horarios, aulas y novedades de tu taller. Agendá este número para recibir los avisos.',
   },
-  { titulo: 'Horario de atención', donde: 'Perfil de la empresa → Horario → "Horario personalizado"', texto: 'Lunes a viernes: 9 a 13 y 16 a 20 hs' },
+  { titulo: 'Horario de atención', donde: 'Perfil de la empresa → Horario → "Horario personalizado"', texto: 'Lunes a viernes: 9 a 13 y 16 a 20 hs\nSábados: 9 a 12 hs' },
   { titulo: 'Dirección', donde: 'Perfil de la empresa → Dirección', texto: DIRECCION },
   { titulo: 'Correo electrónico', donde: 'Perfil de la empresa → Correo electrónico', texto: MAIL },
   { titulo: 'Sitios web (se pueden cargar 2)', donde: 'Perfil de la empresa → Sitio web → Agregar sitio web', texto: `${WEB}\n${INSTAGRAM}` },
