@@ -12,9 +12,14 @@ type Lista = {
 type Listas = { periodo: string; talleres: Lista[]; contactos: (Contacto & { etiquetas: string[] })[] }
 type Texto = { titulo: string; donde?: string; texto: string; atajo?: string }
 
-const HORARIO = '[lunes a viernes de 9 a 13 y de 16 a 20]'
+const HORARIO = 'lunes a viernes de 9 a 13 y de 16 a 20 hs'
+const DIRECCION = 'Paso de los Andes 640, Ciudad de Mendoza'
+const MAIL = 'comunicacion.atluncu@gmail.com'
+const WEB = 'https://aulastiempolibre.uncuyo.edu.ar/'
+const INSTAGRAM = 'https://www.instagram.com/aulasparaeltiempolibre/'
+const FACEBOOK = 'https://www.facebook.com/AulasparaelTiempoLibre/'
 
-const INSCRIPCION_2027 = '*Inscripción 2027*\n• Hasta el 20/12/2026: $57.000\n• Desde febrero 2027: $70.000'
+const INSCRIPCION_2027 = '*Inscripción 2027*\n• Hasta el 20/12/2026: $57.000\n• Desde febrero 2027: $70.000\n👉 ¡Inscribite antes del 20 de diciembre y ahorrás $13.000!'
 const CUOTAS_2027 =
   '*Cuota mensual 2027*\n• Talleres de 3 hs semanales: $70.000 ($64.000 pagando hasta el 10 de cada mes)\n• Talleres de 2 hs semanales: $56.000 ($51.000 pagando hasta el 10 de cada mes)'
 const DESCUENTOS = '*Descuento del 10% en la cuota* si cursás dos o más talleres o si sos parte de la comunidad UNCuyo.'
@@ -32,9 +37,10 @@ const PERFIL: Texto[] = [
     texto:
       'Talleres de idiomas, artes visuales, música, danza, diseño, informática, bienestar y cultura general para personas adultas. Un programa de la Universidad Nacional de Cuyo.\n\nPor este WhatsApp oficial te informamos inscripciones, horarios, aulas y novedades de tu taller. Agendá este número para recibir los avisos.',
   },
-  { titulo: 'Horario de atención', donde: 'Perfil de la empresa → Horario → "Horario personalizado"', texto: 'Lunes a viernes: [9 a 13 y 16 a 20]' },
-  { titulo: 'Dirección', donde: 'Perfil de la empresa → Dirección', texto: '[calle y número de la sede], Mendoza' },
-  { titulo: 'Correo y sitio web', donde: 'Perfil de la empresa → Correo electrónico / Sitio web', texto: '[mail institucional del programa]\n[página web o red social del programa]' },
+  { titulo: 'Horario de atención', donde: 'Perfil de la empresa → Horario → "Horario personalizado"', texto: 'Lunes a viernes: 9 a 13 y 16 a 20 hs' },
+  { titulo: 'Dirección', donde: 'Perfil de la empresa → Dirección', texto: DIRECCION },
+  { titulo: 'Correo electrónico', donde: 'Perfil de la empresa → Correo electrónico', texto: MAIL },
+  { titulo: 'Sitios web (se pueden cargar 2)', donde: 'Perfil de la empresa → Sitio web → Agregar sitio web', texto: `${WEB}\n${INSTAGRAM}` },
 ]
 
 const AUTOMATICOS: Texto[] = [
@@ -58,7 +64,7 @@ const RAPIDAS: Texto[] = [
   { atajo: 'datos', titulo: 'Pedir datos', texto: 'Para ayudarte mejor, ¿nos pasás tu *nombre completo*, tu *DNI* y el *taller* al que vas o que te interesa?' },
   {
     atajo: 'inscripcion', titulo: 'Inscripciones 2027',
-    texto: 'Las inscripciones 2027 son del [fecha de inicio] al [fecha de cierre]. Te podés inscribir [en la sede / en este link: ...]. Necesitás tu DNI y elegir el taller y el horario.\n\n' +
+    texto: 'Ya están abiertas las inscripciones 2027. Te podés inscribir [en la sede / en este link: ...]. Necesitás tu DNI y elegir el taller y el horario.\n\n' +
       INSCRIPCION_2027 +
       '\n\nSi querés, te pasamos la grilla de talleres.',
   },
@@ -84,7 +90,11 @@ const RAPIDAS: Texto[] = [
     texto: DATOS_TRANSFERENCIA + '\n\nCuando transfieras, mandanos por acá la *foto del comprobante* con tu nombre completo y el taller.',
   },
   { atajo: 'comprobante', titulo: 'Comprobante recibido', texto: '¡Gracias! Recibimos tu comprobante y lo registramos. Si hubiera algún problema, te avisamos por acá.' },
-  { atajo: 'sede', titulo: 'Dónde estamos', texto: 'Estamos en [calle y número de la sede], Mendoza. Las aulas están numeradas; si es tu primera clase, preguntá en la entrada y te indicamos cuál es la tuya.' },
+  { atajo: 'sede', titulo: 'Dónde estamos', texto: `Estamos en *${DIRECCION}*. Atendemos de ${HORARIO}. Las aulas están numeradas; si es tu primera clase, preguntá en la entrada y te indicamos cuál es la tuya.` },
+  {
+    atajo: 'redes', titulo: 'Web y redes',
+    texto: `Seguinos para enterarte de todas las novedades:\n🌐 Web: ${WEB}\n📷 Instagram: ${INSTAGRAM}\n👍 Facebook: ${FACEBOOK}\n✉️ Mail: ${MAIL}`,
+  },
   { atajo: 'horario', titulo: 'Horario de atención', texto: `Respondemos consultas por este WhatsApp de ${HORARIO}. Fuera de ese horario dejanos tu mensaje y te contestamos apenas podamos.` },
   {
     atajo: 'ficha', titulo: 'Completar ficha',
@@ -118,9 +128,9 @@ const COMUNICADOS: Texto[] = [
   },
   {
     titulo: '3. Inscripciones 2027',
-    donde: 'Canal + listas de difusión. Mandar 3 o 4 días antes de abrir y repetir el día de apertura.',
+    donde: 'Canal + listas de difusión. Repetirlo unos días antes del 20/12 (fin del precio promocional) y al reabrir en febrero.',
     texto:
-      '*Inscripciones 2027 - Aulas para el Tiempo Libre*\n\nYa podés elegir tus talleres para 2027.\n\n*Fechas:* del [fecha de inicio] al [fecha de cierre].\n*Cómo:* [en la sede de lunes a viernes de ... / en este link: ...].\n*Qué necesitás:* DNI y el nombre, día y horario del taller.\n' +
+      '*Inscripciones 2027 - Aulas para el Tiempo Libre*\n\nYa podés elegir tus talleres para 2027.\n\n*Cómo:* [en la sede / en este link: ...].\n*Qué necesitás:* DNI y el nombre, día y horario del taller.\n\n' +
       INSCRIPCION_2027 +
       '\n\n' +
       CUOTAS_2027 +
