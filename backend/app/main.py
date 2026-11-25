@@ -316,15 +316,37 @@ def conteos(db: Session) -> dict[int, int]:
 
 
 # ----------------------------------------------------------------- agenda
+FIN_CLASES_2026 = date(2026, 11, 30)
+INICIO_CLASES_2027 = date(2027, 3, 1)
+PERIODO_2027 = "2027"
+
+
+def periodo_para_fecha(f: date) -> str | None:
+    """Qué grilla rige en una fecha: 2026 hasta el 30/11, receso dic-feb (None), plano 2027 desde el 1/3/2027."""
+    if f <= FIN_CLASES_2026:
+        return PERIODO_ACTUAL
+    if f >= INICIO_CLASES_2027:
+        return PERIODO_2027
+    return None
+
+
+def talleres_del_dia(db: Session, f: date) -> list[Taller]:
+    periodo = periodo_para_fecha(f)
+    if periodo is None:
+        return []
+    q = (select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente))
+         .where(Taller.dia == f.weekday(), Taller.activo, Taller.periodo == periodo))
+    if periodo == PERIODO_2027:
+        q = q.where(Taller.estado != "No sigue")
+    return list(db.scalars(q.order_by(Taller.desde)).all())
+
+
 @app.get("/api/agenda")
 def agenda(fecha: str | None = None, db: Session = Depends(get_db), _: str = Depends(usuario)):
     f = date.fromisoformat(fecha) if fecha else date.today()
     dia = f.weekday()
     espacios = db.scalars(select(Espacio).where(Espacio.activo).order_by(Espacio.orden)).all()
-    talleres = db.scalars(
-        select(Taller).options(selectinload(Taller.espacio), selectinload(Taller.docente))
-        .where(Taller.dia == dia, Taller.activo, Taller.periodo == PERIODO_ACTUAL).order_by(Taller.desde)
-    ).all()
+    talleres = talleres_del_dia(db, f)
     exc = {e.taller_id: e for e in db.scalars(select(ExcepcionClase).where(ExcepcionClase.fecha == f)).all()}
     insc = conteos(db)
 
@@ -348,7 +370,13 @@ def agenda(fecha: str | None = None, db: Session = Depends(get_db), _: str = Dep
                       "motivo": ev.notas})
 
     items.sort(key=lambda i: (i["desde"], i["titulo"]))
-    return {"fecha": f.isoformat(), "dia_nombre": DIAS[dia],
+    periodo = periodo_para_fecha(f)
+    aviso = ""
+    if periodo is None:
+        aviso = "Receso: las clases 2026 terminaron el 30/11. Los talleres retoman el 1/3/2027 según el plano 2027."
+    elif periodo == PERIODO_2027:
+        aviso = "Agenda 2027 según el plano 2027 (planificación tentativa)."
+    return {"fecha": f.isoformat(), "dia_nombre": DIAS[dia], "periodo": periodo, "aviso": aviso,
             "espacios": [esp_out(e) for e in espacios], "items": items}
 
 
@@ -1313,7 +1341,7 @@ def resumen_db(db: Session):
             select(func.count()).select_from(Objetivo).where(Objetivo.estado == "En curso")) or 0,
         "feedback_registrados": db.scalar(select(func.count()).select_from(Feedback)) or 0,
         "hoy": {"fecha": date.today().isoformat(), "dia_nombre": DIAS[date.today().weekday()],
-                "clases": len([t for t in talleres if t.dia == date.today().weekday()])},
+                "clases": len(talleres_del_dia(db, date.today()))},
         "actualizado": datetime.now().isoformat(timespec="seconds"),
     }
 

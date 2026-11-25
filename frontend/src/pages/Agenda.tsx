@@ -278,8 +278,16 @@ export default function Agenda() {
 
       {!datos && <p className="text-slate-500">Cargando…</p>}
 
+      {datos && datos.aviso && (
+        <div className={`rounded-lg border px-4 py-2 text-sm ${datos.periodo ? 'bg-sky-50 border-sky-200 text-sky-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {datos.aviso}
+        </div>
+      )}
+
       {datos && datos.items.length === 0 && (
-        <div className="tarjeta p-8 text-center text-slate-500">No hay nada agendado para este día.</div>
+        <div className="tarjeta p-8 text-center text-slate-500">
+          {datos.periodo ? 'No hay nada agendado para este día.' : 'Sin clases: receso de verano. Sólo se muestran las actividades cargadas a mano.'}
+        </div>
       )}
 
       {datos && vista === 'grilla' && datos.items.length > 0 && (

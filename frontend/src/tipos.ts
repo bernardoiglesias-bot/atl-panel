@@ -50,6 +50,8 @@ export type ItemAgenda = {
 export type Agenda = {
   fecha: string
   dia_nombre: string
+  periodo: string | null
+  aviso: string
   espacios: Espacio[]
   items: ItemAgenda[]
 }
