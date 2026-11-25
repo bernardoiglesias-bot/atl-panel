@@ -2,9 +2,9 @@ import json
 import os
 from datetime import date, datetime, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ from .models import (
     Usuario,
 )
 from .respaldo import arrancar as arrancar_respaldo
+from .importar_alumnos import sincronizar
 from .seed import cargar
 from .whatsapp import normalizar_celular
 from .seguridad import (
@@ -683,6 +684,18 @@ def listar_alumnos(q: str = "", solo_incompletos: bool = False, taller_id: int |
     inicio = (pagina - 1) * por_pagina
     return {"total": total, "pagina": pagina, "por_pagina": por_pagina,
             "alumnos": [alumno_out(a) for a in alumnos[inicio:inicio + por_pagina]]}
+
+
+@app.post("/api/alumnos/importar")
+async def importar_alumnos(aplicar: bool = False, archivo: UploadFile = File(...),
+                           db: Session = Depends(get_db), _: str = Depends(coordinador)):
+    """Sincroniza alumnos e inscripciones con la planilla del cuatrimestre; con aplicar=false sólo simula."""
+    contenido = await archivo.read()
+    try:
+        return sincronizar(db, contenido, aplicar)
+    except Exception as e:  # planilla con otro formato
+        db.rollback()
+        raise HTTPException(400, f"No pude leer la planilla: {e}") from e
 
 
 @app.put("/api/alumnos/{alumno_id}")

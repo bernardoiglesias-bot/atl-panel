@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api } from '../api'
+import { api, esCoordinacion, getToken } from '../api'
 import type { Alumno } from '../tipos'
 
 const PAGOS = ['Sin dato', 'Al día', 'Debe', 'Bonificado']
@@ -69,6 +69,22 @@ function Ficha({ alumno, onCerrar, onGuardado }: { alumno: Alumno; onCerrar: () 
   )
 }
 
+type ResultadoImportacion = {
+  aplicado: boolean
+  personas_planilla: number
+  inscripciones_planilla: number
+  repetidas_descartadas: number
+  dni_compartidos: string[]
+  alumnos_nuevos: number
+  alumnos_actualizados: number
+  inscripciones_nuevas: number
+  inscripciones_bajas: number
+  alumnos_sin_inscripcion: number
+  sin_taller: number
+  nuevos: string[]
+  bajas: string[]
+}
+
 export default function Alumnos() {
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
@@ -76,6 +92,34 @@ export default function Alumnos() {
   const [pagina, setPagina] = useState(1)
   const [datos, setDatos] = useState<{ total: number; alumnos: Alumno[] } | null>(null)
   const [abierto, setAbierto] = useState<Alumno | null>(null)
+  const [importando, setImportando] = useState(false)
+  const [resultado, setResultado] = useState<ResultadoImportacion | null>(null)
+  const archivo = useRef<HTMLInputElement>(null)
+
+  async function importar(aplicar: boolean) {
+    const f = archivo.current?.files?.[0]
+    if (!f) return
+    setImportando(true)
+    try {
+      const cuerpo = new FormData()
+      cuerpo.append('archivo', f)
+      const r = await fetch(`/api/alumnos/importar?aplicar=${aplicar}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${getToken()}` },
+        body: cuerpo,
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'No se pudo leer la planilla')
+      setResultado(await r.json())
+      if (aplicar) {
+        if (archivo.current) archivo.current.value = ''
+        cargar()
+      }
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setImportando(false)
+    }
+  }
 
   async function cargar() {
     const d = await api<{ total: number; alumnos: Alumno[] }>(
@@ -118,6 +162,55 @@ export default function Alumnos() {
         </label>
         <span className="text-sm text-slate-500">{datos?.total ?? 0} alumnos</span>
       </div>
+
+      {esCoordinacion() && (
+        <div className="tarjeta p-4 space-y-2">
+          <p className="text-sm font-medium text-marca-800">Actualizar desde la planilla de alumnos</p>
+          <p className="text-xs text-slate-500">
+            Subí el Excel "Alumnos por Turno-Taller-Día y Horario". Primero se muestra qué cambiaría; después confirmás.
+            No se borra ninguna persona: sólo se dan de baja las inscripciones que ya no figuran.
+          </p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <input ref={archivo} type="file" accept=".xlsx" className="text-sm" onChange={() => setResultado(null)} />
+            <button className="boton" disabled={importando} onClick={() => importar(false)}>
+              {importando ? 'Leyendo…' : 'Ver qué cambia'}
+            </button>
+            {resultado && !resultado.aplicado && (
+              <button className="boton bg-emerald-700 hover:bg-emerald-800" disabled={importando} onClick={() => importar(true)}>
+                Aplicar cambios
+              </button>
+            )}
+          </div>
+          {resultado && (
+            <div className="text-sm text-slate-700 space-y-1">
+              <p>
+                {resultado.aplicado ? 'Aplicado: ' : 'Si aplicás: '}
+                <b>{resultado.alumnos_nuevos}</b> alumnos nuevos, <b>{resultado.alumnos_actualizados}</b> con datos
+                actualizados, <b>{resultado.inscripciones_nuevas}</b> inscripciones nuevas y{' '}
+                <b>{resultado.inscripciones_bajas}</b> bajas ({resultado.alumnos_sin_inscripcion} personas quedan sin
+                taller). Planilla: {resultado.personas_planilla} personas, {resultado.inscripciones_planilla}{' '}
+                inscripciones ({resultado.repetidas_descartadas} repetidas descartadas, {resultado.sin_taller} sin
+                taller reconocido).
+              </p>
+              {resultado.dni_compartidos.length > 0 && (
+                <p className="text-amber-700">DNI repetido en personas distintas (revisar en el Excel): {resultado.dni_compartidos.join(', ')}</p>
+              )}
+              {resultado.bajas.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">Bajas ({resultado.bajas.length})</summary>
+                  <ul className="list-disc pl-5">{resultado.bajas.map((b) => <li key={b}>{b}</li>)}</ul>
+                </details>
+              )}
+              {resultado.nuevos.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">Alumnos nuevos ({resultado.nuevos.length})</summary>
+                  <ul className="list-disc pl-5">{resultado.nuevos.map((b) => <li key={b}>{b}</li>)}</ul>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="tarjeta overflow-hidden">
         <table className="w-full text-sm">

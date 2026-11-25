@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 
 A = '/home/ubuntu/attachments'
 WORD = f'{A}/055da4e0-34fe-44e2-b25a-4efa85aae4ce/TALLERES_2026_semanales.docx'
-ALUMNOS = f'{A}/03f9e3e2-c2bd-42cb-8b36-0829c19cb9fc/Alumnos_por_Turno-Taller-Día_y_Horario_1.xlsx'
+ALUMNOS = f'{A}/392a341a-c927-4f4f-b7fb-51076d6b02fc/Alumnos_por_Turno-Taller-Día_y_Horario_2.xlsx'
 DOCENTES = f'{A}/376136e6-d067-4b23-b0fb-4dfd85731e5d/Datos_Profesores_as_Aulas_para_el_Tiempo_Libre_2026_.xlsx'
 PERSONAL = f'{A}/e77dce36-d82d-4a6b-bdb5-1daac46e5dc1/Planilla_de_Personal_-_Aulas_para_el_Tiempo_Libre.xlsx'
 OUT = os.path.join(os.path.dirname(__file__), '..', 'backend', 'data', 'seed.json')
