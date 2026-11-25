@@ -687,10 +687,13 @@ def listar_alumnos(q: str = "", solo_incompletos: bool = False, taller_id: int |
 
 
 @app.post("/api/alumnos/importar")
-async def importar_alumnos(aplicar: bool = False, archivo: UploadFile = File(...),
-                           db: Session = Depends(get_db), _: str = Depends(coordinador)):
-    """Sincroniza alumnos e inscripciones con la planilla del cuatrimestre; con aplicar=false sólo simula."""
-    contenido = await archivo.read()
+def importar_alumnos(aplicar: bool = False, archivo: UploadFile = File(...),
+                     db: Session = Depends(get_db), _: str = Depends(coordinador)):
+    """Sincroniza alumnos e inscripciones con la planilla; con aplicar=false sólo simula.
+
+    Es sincrónica a propósito: corre en el threadpool y no bloquea /healthz mientras procesa.
+    """
+    contenido = archivo.file.read()
     try:
         return sincronizar(db, contenido, aplicar)
     except Exception as e:  # planilla con otro formato

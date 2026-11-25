@@ -139,6 +139,7 @@ def leer_planilla(contenido: bytes):
 
 def sincronizar(db: Session, contenido: bytes, aplicar: bool) -> dict:
     personas, repetidas, dni_dudosos = leer_planilla(contenido)
+    db.autoflush = False
     talleres = db.scalars(select(Taller).where(Taller.periodo == PERIODO_ACTUAL)).all()
     alumnos = db.scalars(select(Alumno).options(selectinload(Alumno.inscripciones))).all()
     db_por_dni = {a.dni: a for a in alumnos if a.dni}
